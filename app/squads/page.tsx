@@ -10,7 +10,7 @@ import { SquadHub, SquadJoinCard } from "@/components/squad-hub";
 import { Users } from "lucide-react";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Squads" };
+export const metadata: Metadata = { title: "Týmy" };
 
 export default async function SquadsPage() {
   const [user, lang] = await Promise.all([getCurrentUser(), getLang()]);

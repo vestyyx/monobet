@@ -128,7 +128,7 @@ export function AuthForm({ lang, inviter }: { lang?: Lang; inviter?: Inviter }) 
             id="u"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            placeholder="e.g. satoshi"
+            placeholder={t.usernamePlaceholder}
             autoComplete="username"
             className="mt-1"
           />

@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { Medal, Trophy, Users } from "lucide-react";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Leaderboard" };
+export const metadata: Metadata = { title: "Žebříček" };
 
 const MEDALS = ["text-amber-500", "text-slate-400", "text-amber-700"];
 const PODIUM_BARS = ["bg-amber-500/80", "bg-slate-400/80", "bg-amber-700/80"];

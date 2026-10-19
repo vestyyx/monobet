@@ -5,7 +5,7 @@ import { getLang } from "@/lib/lang-server";
 import { getInviter } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Log in" };
+export const metadata: Metadata = { title: "Přihlášení" };
 
 export default async function LoginPage({
   searchParams,

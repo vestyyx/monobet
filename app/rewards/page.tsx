@@ -17,7 +17,7 @@ import {
 } from "@/lib/rewards";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Rewards" };
+export const metadata: Metadata = { title: "Odměny" };
 
 export default async function RewardsPage() {
   const [user, lang] = await Promise.all([getCurrentUser(), getLang()]);

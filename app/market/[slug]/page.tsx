@@ -87,12 +87,12 @@ export async function generateMetadata({
   const groupVolume = m?.kind === "group" ? (await getGroupOptions(m.id)).reduce((s, o) => s + o.volumeCents, 0) : 0;
   const shownVolume = m?.kind === "group" ? groupVolume : (m?.volumeCents ?? 0);
   return {
-    title: m?.question ?? "Market",
+    title: m?.question ?? "Trh",
     description: m
       ? m.kind === "group"
-        ? `${fmtMonos(shownVolume)} traded on MonoPredict — play-money markets`
-        : `${pct}% YES · ${fmtMonos(shownVolume)} traded on MonoPredict — play-money markets`
-      : "MonoPredict market",
+        ? `${fmtMonos(shownVolume)} zobchodováno na MonoPredict`
+        : `${pct}% ANO · ${fmtMonos(shownVolume)} zobchodováno na MonoPredict`
+      : "Trh na MonoPredict",
     openGraph: m ? { title: m.question } : undefined,
   };
 }

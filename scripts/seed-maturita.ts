@@ -104,12 +104,13 @@ async function main() {
   // a) Markets to delete — matching question/category, plus the whole group
   // when only an option matches (children cascade with the parent).
   const matched = await db
-    .select({ id: schema.market.id, parentId: schema.market.parentId, question: schema.market.question, category: schema.market.category })
+    .select({ id: schema.market.id, parentId: schema.market.parentId, question: schema.market.question, category: schema.market.category, label: schema.market.label })
     .from(schema.market)
     .where(
       or(
         eq(schema.market.category, BANNED_CATEGORY),
-        ...BANNED_WORDS.map((w) => ilike(schema.market.question, `%${w}%`))
+        ...BANNED_WORDS.map((w) => ilike(schema.market.question, `%${w}%`)),
+        ...BANNED_WORDS.map((w) => ilike(schema.market.label, `%${w}%`))
       )
     );
   const deleteIds = [...new Set(matched.map((m) => m.parentId ?? m.id))];

@@ -5,7 +5,7 @@ import { getT } from "@/lib/i18n";
 import { Card } from "@/components/ui/primitives";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Terms" };
+export const metadata: Metadata = { title: "Podmínky" };
 
 export default async function TermsPage() {
   const lang = await getLang();

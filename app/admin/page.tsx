@@ -10,7 +10,7 @@ import { Card } from "@/components/ui/primitives";
 import { ShieldCheck, Inbox, Radio, Users, PlusCircle, Tags, UserPlus, Swords, Spade, Landmark } from "lucide-react";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Admin" };
+export const metadata: Metadata = { title: "Administrace" };
 
 export default async function AdminPage() {
   const [user, lang] = await Promise.all([getCurrentUser(), getLang()]);

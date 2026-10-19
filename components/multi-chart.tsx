@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { getT, LOCALES, type Lang } from "@/lib/i18n";
 import { fmtMonos } from "@/lib/money";
-import { cn } from "@/lib/utils";
+import { cn, openPct } from "@/lib/utils";
 
 type Pt = { t: string; p: number };
 export type Series = { key: string; label: string; color: string; points: Pt[] };
@@ -181,7 +181,12 @@ export function MultiPriceChart({
             const focused = !focusKey || s.key === focusKey;
             // On hover the chips follow the crosshair — Polymarket-style.
             const hp = hoverPts?.find((h) => h.s.key === s.key);
-            const pct = Math.round((hp ? hp.p.p : s.pts[s.pts.length - 1].p) * 100);
+            const latestPct = s.pts[s.pts.length - 1].p;
+            const pct = hp
+              ? Math.round(hp.p.p * 100)
+              : live
+                ? openPct(latestPct)
+                : Math.round(latestPct * 100);
             return (
               <button
                 key={s.key}
