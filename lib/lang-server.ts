@@ -6,5 +6,5 @@ import { LANG_COOKIE, type Lang } from "@/lib/i18n";
 // simple document.cookie write + router.refresh().
 export async function getLang(): Promise<Lang> {
   const c = await cookies();
-  return c.get(LANG_COOKIE)?.value === "cs" ? "cs" : "en";
+  return c.get(LANG_COOKIE)?.value === "en" ? "en" : "cs";
 }

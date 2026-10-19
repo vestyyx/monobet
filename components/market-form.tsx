@@ -24,7 +24,7 @@ export function MarketForm({
   categories: string[];
   lang?: Lang;
 }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const LIQUIDITY = [
     { b: 300, label: t.liqThin, hint: t.liqThinHint },
     { b: 1000, label: t.liqStandard, hint: t.liqStandardHint },

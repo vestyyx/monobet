@@ -10,7 +10,7 @@ const SEEN_KEY = "mb_intro_seen";
 // reopenable from the footer link (which fires the "mb:intro" event). Signed-in
 // users never get the auto-popup — they already know the site.
 export function IntroVideo({ lang, autoplay = true }: { lang?: Lang; autoplay?: boolean }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -73,7 +73,7 @@ export function IntroVideo({ lang, autoplay = true }: { lang?: Lang; autoplay?: 
 
 // Footer trigger — reopens the trailer without a page reload.
 export function TrailerLink({ lang }: { lang?: Lang }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   return (
     <button
       type="button"

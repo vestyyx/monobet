@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { getT, LOCALES, type Lang } from "@/lib/i18n";
 import { fmtMonos } from "@/lib/money";
-import { cn } from "@/lib/utils";
+import { cn, openPct } from "@/lib/utils";
 
 type Pt = { t: string; p: number };
 export type Series = { key: string; label: string; color: string; points: Pt[] };
@@ -108,8 +108,8 @@ export function MultiPriceChart({
   trades?: ChartMarker[];
   onSelectKey?: (key: string) => void;
 }) {
-  const t = getT(lang ?? "en");
-  const locale = LOCALES[lang ?? "en"];
+  const t = getT(lang ?? "cs");
+  const locale = LOCALES[lang ?? "cs"];
   const [range, setRange] = useState<(typeof RANGES)[number]["key"]>("ALL");
   const [hoverT, setHoverT] = useState<number | null>(null);
   const [mark, setMark] = useState<number | null>(null);
@@ -181,7 +181,12 @@ export function MultiPriceChart({
             const focused = !focusKey || s.key === focusKey;
             // On hover the chips follow the crosshair — Polymarket-style.
             const hp = hoverPts?.find((h) => h.s.key === s.key);
-            const pct = Math.round((hp ? hp.p.p : s.pts[s.pts.length - 1].p) * 100);
+            const latestPct = s.pts[s.pts.length - 1].p;
+            const pct = hp
+              ? Math.round(hp.p.p * 100)
+              : live
+                ? openPct(latestPct)
+                : Math.round(latestPct * 100);
             return (
               <button
                 key={s.key}
@@ -217,7 +222,7 @@ export function MultiPriceChart({
                 range === r.key ? "bg-surface shadow-sm text-ink" : "text-mute hover:text-ink"
               )}
             >
-              {RANGE_LABEL[lang ?? "en"][r.key]}
+              {RANGE_LABEL[lang ?? "cs"][r.key]}
             </button>
           ))}
         </div>

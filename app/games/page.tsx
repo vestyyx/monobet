@@ -12,7 +12,7 @@ import { Gamepad2, Coins, Dices, Timer, Rocket, Disc3, Cherry, Spade, CircleDot,
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Games" };
+export const metadata: Metadata = { title: "Hry" };
 
 export default async function GamesPage() {
   const [user, lang] = await Promise.all([getCurrentUser(), getLang()]);

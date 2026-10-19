@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 // A chevron at the right edge scrolls the row; "All markets" links to the
 // /markets overview page.
 export function CategoryTabs({ categories, lang, showWatching }: { categories: string[]; lang?: Lang; showWatching?: boolean }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const params = useSearchParams();
   const active = params.get("cat") ?? "all";
   const q = params.get("q");

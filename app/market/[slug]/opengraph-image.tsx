@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og";
 import { getMarketBySlug, getGroupOptions, getGroupTraderCount, marketYesPrice, groupPrices } from "@/lib/queries";
 import { fmtMonos } from "@/lib/money";
 
-export const alt = "MonoBet market";
+export const alt = "MonoPredict market";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 export const dynamic = "force-dynamic";
@@ -71,7 +71,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
             />
             <circle cx="198" cy="60" r="22" fill={YES} />
           </svg>
-          <div style={{ fontSize: 30, fontWeight: 700, color: "#ffffff" }}>MonoBet</div>
+          <div style={{ fontSize: 30, fontWeight: 700, color: "#ffffff" }}>MonoPredict</div>
           <div
             style={{
               marginLeft: 12,

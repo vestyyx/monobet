@@ -3,7 +3,7 @@ import { getT, type Lang } from "@/lib/i18n";
 // Public yes/no stance split for a community-notes list — same bar the
 // resolver sees in the review stack, now shown to everyone above the notes.
 export function NoteStanceBar({ notes, lang }: { notes: { stance?: string | null }[]; lang?: Lang }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const yes = notes.filter((n) => n.stance === "yes").length;
   const no = notes.filter((n) => n.stance === "no").length;
   const neutral = notes.length - yes - no;

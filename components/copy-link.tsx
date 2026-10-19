@@ -7,7 +7,7 @@ import { getT, type Lang } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 export function CopyLink({ path, lang, className }: { path: string; lang?: Lang; className?: string }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const [copied, setCopied] = useState(false);
   return (
     <button

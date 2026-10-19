@@ -10,7 +10,7 @@ import { levFeeCents, LEV_FEE_BPS } from "@/lib/liq";
 import { fmtMonos, fmtCents, fmtShares, fmtDateTime } from "@/lib/money";
 import { playSfx } from "@/lib/sfx";
 import { getT, type Lang } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { cn, openPct } from "@/lib/utils";
 import { Clock, Crosshair, TrendingDown } from "lucide-react";
 import { placeTrade, setStops } from "@/lib/actions";
 
@@ -70,7 +70,7 @@ export function TradeTicket({
   const [leverage, setLeverage] = useState("1");
   const [pending, start] = useTransition();
   const router = useRouter();
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
 
   const shared = sharedQ != null && sharedIndex != null && sharedIndex >= 0;
   const py = shared ? multiPrices(sharedQ, b)[sharedIndex] ?? 0 : yesPrice(qYes, qNo, b);
@@ -139,8 +139,8 @@ export function TradeTicket({
       <div className="mt-3">
         <Segmented
           options={[
-            { value: "yes", label: `${t.yes} ${fmtMonos(Math.round(py * 100), { lang })}`, tone: "yes" },
-            { value: "no", label: `${t.no} ${fmtMonos(Math.round((1 - py) * 100), { lang })}`, tone: "no" },
+            { value: "yes", label: `${t.yes} ${fmtMonos(openPct(py), { lang })}`, tone: "yes" },
+            { value: "no", label: `${t.no} ${fmtMonos(openPct(1 - py), { lang })}`, tone: "no" },
           ]}
           value={outcome}
           onChange={setOutcome}
@@ -334,7 +334,7 @@ function StopsEditor({
   lang?: Lang;
   onDone: () => void;
 }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const [tpIn, setTpIn] = useState(current.tp == null ? "" : String(Math.round(current.tp * 100)));
   const [slIn, setSlIn] = useState(current.sl == null ? "" : String(Math.round(current.sl * 100)));
   const [pct, setPct] = useState(current.pct ?? 100);

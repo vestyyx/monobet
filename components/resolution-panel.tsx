@@ -64,7 +64,7 @@ export function ResolutionPanel({
   contextLabel?: string;
   lang?: Lang;
 }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const router = useRouter();
   const [pending, start] = useTransition();
   const [outcome, setOutcome] = useState<"yes" | "no">("yes");

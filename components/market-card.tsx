@@ -16,7 +16,7 @@ import { LikeButton } from "@/components/like-button";
 import { AnimatedPct } from "@/components/animated-number";
 import { Badge } from "@/components/ui/primitives";
 import { getT, type Lang } from "@/lib/i18n";
-import { cn, slugifyLabel } from "@/lib/utils";
+import { cn, openPct, slugifyLabel } from "@/lib/utils";
 
 const CARD =
   "group flex flex-col rounded-[14px] border border-line bg-surface p-4 shadow-[0_1px_2px_rgba(16,16,20,0.04)] hover:shadow-[0_6px_20px_rgba(16,16,20,0.09)] hover:border-faint/60 hover:-translate-y-0.5 transition-all duration-200 anim-rise";
@@ -46,7 +46,7 @@ export function MarketCard({
   trending?: boolean;
   groupTraders?: number;
 }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   if (market.kind === "group") return <GroupCard market={market} options={options ?? []} index={index} lang={lang} watching={watching} liked={liked} likes={likes} trending={trending} traders={groupTraders} />;
 
   const py = marketYesPrice(market);
@@ -80,7 +80,7 @@ export function MarketCard({
             ) : expired ? (
               <Badge tone="warn">{t.closedAwaiting}</Badge>
             ) : (
-              <AnimatedPct value={py} className={py >= 0.5 ? "text-yes" : "text-ink"} />
+              <AnimatedPct value={openPct(py) / 100} className={py >= 0.5 ? "text-yes" : "text-ink"} />
             )}
           </div>
           {market.status === "live" && <div className="text-[11px] text-mute mt-1.5 font-medium">{t.chance}</div>}
@@ -90,10 +90,10 @@ export function MarketCard({
       {market.status === "live" && !expired && (
         <div className="mt-3 grid grid-cols-2 gap-2">
           <span className="grid place-items-center h-8.5 rounded-md bg-yes-soft text-yes-strong text-[13px] font-semibold">
-            {t.buyYes} {fmtMonos(Math.round(py * 100), { lang })}
+            {t.buyYes} {fmtMonos(openPct(py), { lang })}
           </span>
           <span className="grid place-items-center h-8.5 rounded-md bg-no-soft text-no-strong text-[13px] font-semibold">
-            {t.buyNo} {fmtMonos(Math.round((1 - py) * 100), { lang })}
+            {t.buyNo} {fmtMonos(openPct(1 - py), { lang })}
           </span>
         </div>
       )}
@@ -125,7 +125,7 @@ export function MarketCard({
 // Multi-outcome card — Polymarket's "X by when?" style. Each option row links
 // to its own binary market; resolved options collapse under "View resolved".
 function GroupCard({ market, options, index, lang, watching, liked, likes = 0, trending, traders }: { market: MarketRow; options: MarketRow[]; index: number; lang?: Lang; watching?: boolean; liked?: boolean; likes?: number; trending?: boolean; traders?: number }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const parentExpired = !!market.closesAt && market.closesAt <= new Date();
   const live = options.filter((o) => o.status === "live");
   const closed = options.filter((o) => o.status !== "live");
@@ -200,7 +200,7 @@ function GroupCard({ market, options, index, lang, watching, liked, likes = 0, t
 }
 
 function OptionRow({ option: o, parentSlug, index, lang, expired, price }: { option: MarketRow; parentSlug: string; index: number; lang?: Lang; expired?: boolean; price?: number }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const py = price ?? marketYesPrice(o);
   const resolved = o.status === "resolved";
   return (
@@ -225,18 +225,18 @@ function OptionRow({ option: o, parentSlug, index, lang, expired, price }: { opt
         <Badge tone="mute" className="shrink-0">{t.cancelled}</Badge>
       ) : expired ? (
         <span className={cn("num w-10 text-right text-[14px] font-bold shrink-0", py >= 0.5 ? "text-yes" : "text-ink")}>
-          {Math.round(py * 100)}%
+          {openPct(py)}%
         </span>
       ) : (
         <>
           <span className={cn("num w-10 text-right text-[14px] font-bold shrink-0", py >= 0.5 ? "text-yes" : "text-ink")}>
-            {Math.round(py * 100)}%
+            {openPct(py)}%
           </span>
           <span className="num grid place-items-center h-7 w-20 rounded-md bg-yes-soft text-yes-strong text-[12px] font-semibold whitespace-nowrap shrink-0">
-            {t.yes} {fmtMonos(Math.round(py * 100), { lang })}
+            {t.yes} {fmtMonos(openPct(py), { lang })}
           </span>
           <span className="num grid place-items-center h-7 w-20 rounded-md bg-no-soft text-no-strong text-[12px] font-semibold whitespace-nowrap shrink-0">
-            {t.no} {fmtMonos(Math.round((1 - py) * 100), { lang })}
+            {t.no} {fmtMonos(openPct(1 - py), { lang })}
           </span>
         </>
       )}

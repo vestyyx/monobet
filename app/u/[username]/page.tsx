@@ -340,7 +340,7 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "up
 }
 
 function KindBadge({ kind, lang }: { kind: string; lang?: Lang }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const map: Record<string, { label: string; tone: "yes" | "no" | "ink" | "mute" | "warn" }> = {
     signup: { label: t.kindBonus, tone: "ink" },
     claim: { label: t.kindClaim, tone: "ink" },

@@ -23,7 +23,7 @@ export function UserMenu({
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const router = useRouter();
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -53,9 +53,9 @@ export function UserMenu({
           <Link href={`/u/${username ?? name}`} className={item} onClick={() => setOpen(false)}>
             {t.myProfile}
           </Link>
-          <Link href="/duels" className={item} onClick={() => setOpen(false)}>
+          {/* <Link href="/duels" className={item} onClick={() => setOpen(false)}>
             {t.duelsTitle}
-          </Link>
+          </Link> */}
           <Link href="/squads" className={item} onClick={() => setOpen(false)}>
             {t.squadsTitle}
           </Link>

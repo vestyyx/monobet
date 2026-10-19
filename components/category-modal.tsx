@@ -19,7 +19,7 @@ export function CategoryModal({
   onPicked: (name: string) => void;
   lang?: Lang;
 }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   if (!open) return null;

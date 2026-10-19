@@ -15,7 +15,7 @@ import { ImageCell, IconPicker } from "@/components/image-cell";
 import { DealerAvatar } from "@/components/dealer-avatar";
 
 function useAction(lang?: Lang) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const [pending, start] = useTransition();
   const router = useRouter();
   const run = (fn: () => Promise<{ ok: boolean; error?: string; paidOut?: number }>, ok: string) =>
@@ -37,7 +37,7 @@ export function PendingList({
   lang?: Lang;
 }) {
   const { pending, run } = useAction(lang);
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   if (items.length === 0) return <p className="p-4 text-sm text-mute">{t.noPending}</p>;
   return (
     <div className="divide-y divide-line-2">
@@ -84,7 +84,7 @@ export function LiveMarketList({
   lang?: Lang;
 }) {
   const { pending, run } = useAction(lang);
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   // Group options nest under their parent — one row per market, children
   // resolve individually inside an expandable block.
   const tops = items.filter((m) => !m.parentId);
@@ -191,7 +191,7 @@ export function GrantPanel({ users, lang }: { users: { id: string; username: str
   const [amount, setAmount] = useState("");
   const [memo, setMemo] = useState("");
   const { pending, run } = useAction(lang);
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
 
   return (
     <form
@@ -273,7 +273,7 @@ export function HousePanel({
   users: { id: string; username: string | null; luckBps: number }[];
   lang?: Lang;
 }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const { pending, run } = useAction(lang);
   const [rigPct, setRigPct] = useState((stats.rigBps / 100).toFixed(0));
   const [luckUser, setLuckUser] = useState(users[0]?.id ?? "");
@@ -680,7 +680,7 @@ export function UsersPanel({ lang }: { lang?: Lang }) {
   const [password, setPassword] = useState("");
   const [admin, setAdmin] = useState(false);
   const { pending, run } = useAction(lang);
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
 
   return (
     <form
@@ -741,7 +741,7 @@ export function UserManager({
   lang?: Lang;
 }) {
   const { pending, run } = useAction(lang);
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   if (users.length === 0) return <p className="p-4 text-sm text-mute">{t.umNoUsers}</p>;
   return (
     <div className="divide-y divide-line-2">
@@ -849,7 +849,7 @@ export function CategoriesPanel({
   categories: { name: string; markets: number }[];
   lang?: Lang;
 }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const router = useRouter();
   const [pending, start] = useTransition();
   const [newName, setNewName] = useState("");
@@ -1027,7 +1027,7 @@ export function DuelAdminPanel({
   }[];
   lang?: Lang;
 }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const router = useRouter();
   const [pending, start] = useTransition();
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>, ok: string) =>
@@ -1076,7 +1076,7 @@ export function DealersPanel({
   dealers: { id: string; name: string; avatar: string; quipWin: string; quipLose: string; active: boolean }[];
   lang?: Lang;
 }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const router = useRouter();
   const [pending, start] = useTransition();
   const [name, setName] = useState("");
@@ -1193,7 +1193,7 @@ function DealerForm({
   onSave: (v: { name: string; avatar: string; quipWin: string; quipLose: string }) => void;
   onCancel: (() => void) | null;
 }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   // Inline-edit rows manage their own state; the add form lifts it to the parent.
   const [n, setN] = useState(initial?.name ?? "");
   const [a, setA] = useState(initial?.avatar ?? "");

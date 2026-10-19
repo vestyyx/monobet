@@ -18,7 +18,7 @@ import { getT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "All markets" };
+export const metadata: Metadata = { title: "Všechny trhy" };
 
 // Full browse view — every market, filterable by category, sort, and status.
 export default async function MarketsPage({

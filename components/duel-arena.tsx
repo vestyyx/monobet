@@ -15,7 +15,7 @@ import { KIND_ICONS, duelFmtMove, duelKindLabels, duelMoveLabel, type DuelRow, t
 // Full-screen event stage for a single duel — a dedicated route so the fight
 // is deep-linkable and survives refreshes. Polls for the opponent's moves.
 export function DuelArena({ row, me, lang }: { row: DuelRow; me: string; lang?: Lang }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const router = useRouter();
   const [pending, start] = useTransition();
   const [limboTarget, setLimboTarget] = useState("2");

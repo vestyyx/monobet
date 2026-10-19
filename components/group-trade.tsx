@@ -11,7 +11,7 @@ import { MultiPriceChart, type Series, type ChartMarker } from "@/components/mul
 import { multiCoords, multiPrices } from "@/lib/lmsr";
 import { fmtMonos } from "@/lib/money";
 import { getT, type Lang } from "@/lib/i18n";
-import { cn, slugifyLabel } from "@/lib/utils";
+import { cn, openPct, slugifyLabel } from "@/lib/utils";
 import type { MyPositionEntry } from "@/lib/queries";
 
 export type GroupOption = {
@@ -98,7 +98,7 @@ export function GroupTrade({
   left?: React.ReactNode;
   rail?: React.ReactNode;
 }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const live = options.filter((o) => o.status === "live");
   const closed = options.filter((o) => o.status !== "live");
   // ?opt= accepts the option label slug (readable), the child market slug, or the id (legacy links).
@@ -156,7 +156,7 @@ export function GroupTrade({
           <OptionChip label={sel.label} index={sel.index} imageUrl={sel.imageUrl} />
           <span className="min-w-0 flex-1 text-[14px] font-semibold truncate">{sel.label}</span>
           <span className="num text-[15px] font-bold shrink-0">
-            {Math.round((probs[selIdx] ?? 0) * 100)}%
+            {openPct(probs[selIdx] ?? 0)}%
           </span>
         </div>
       }
@@ -227,7 +227,7 @@ export function GroupTrade({
                   </span>
                   <span className="num hidden sm:block text-right text-[12.5px] text-mute">{o.traderCount}</span>
                   <span className={cn("num text-right text-[15px] font-bold", py >= 0.5 ? "text-yes" : "text-ink")}>
-                    {Math.round(py * 100)}%
+                    {openPct(py)}%
                   </span>
                   {!parentClosed && (
                   <span className="hidden sm:grid grid-cols-2 gap-1.5">
@@ -239,7 +239,7 @@ export function GroupTrade({
                       }}
                       className="num grid place-items-center h-8 w-20 rounded-md bg-yes-soft text-yes-strong text-[12px] font-semibold whitespace-nowrap hover:brightness-95 transition cursor-pointer"
                     >
-                      {t.yes} {fmtMonos(Math.round(py * 100), { lang })}
+                      {t.yes} {fmtMonos(openPct(py), { lang })}
                     </button>
                     <button
                       type="button"
@@ -249,7 +249,7 @@ export function GroupTrade({
                       }}
                       className="num grid place-items-center h-8 w-20 rounded-md bg-no-soft text-no-strong text-[12px] font-semibold whitespace-nowrap hover:brightness-95 transition cursor-pointer"
                     >
-                      {t.no} {fmtMonos(Math.round((1 - py) * 100), { lang })}
+                      {t.no} {fmtMonos(openPct(1 - py), { lang })}
                     </button>
                   </span>
                   )}

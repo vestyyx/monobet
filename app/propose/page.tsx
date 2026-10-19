@@ -6,7 +6,7 @@ import { getLang } from "@/lib/lang-server";
 import { getT } from "@/lib/i18n";
 import { MarketForm } from "@/components/market-form";
 
-export const metadata: Metadata = { title: "Create a market" };
+export const metadata: Metadata = { title: "Nový trh" };
 
 export default async function ProposePage() {
   const [user, lang, categories] = await Promise.all([getCurrentUser(), getLang(), listCategories()]);

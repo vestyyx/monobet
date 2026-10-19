@@ -23,7 +23,7 @@ export function LikeButton({
   lang?: Lang;
   className?: string;
 }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const [liked, setLiked] = useState(initial);
   const [count, setCount] = useState(initialCount);
   const [pending, start] = useTransition();

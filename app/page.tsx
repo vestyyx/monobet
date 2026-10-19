@@ -14,7 +14,7 @@ import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = { title: "Markets" };
+export const metadata: Metadata = { title: { absolute: "MonoPredict — Platforma pro kolektivní prognózování" } };
 
 export default async function Home({
   searchParams,

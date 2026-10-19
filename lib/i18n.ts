@@ -103,7 +103,7 @@ const en = {
   relatedMarkets: "Related markets",
   resolverNote: "Resolved by the creator or an admin",
   watchTrailer: "Watch the trailer",
-  welcomeTitle: "Welcome to MonoBet",
+  welcomeTitle: "Welcome to MonoPredict",
   welcomeSub: "Virtual prediction markets — play money only.",
   option: "Option",
   allClosed: "All options are closed.",
@@ -510,6 +510,7 @@ const en = {
   loginSub: "Bet virtual Monos on custom events.",
   signupSub: "Ɱ 1,000 play money on signup. No real money involved.",
   username: "Username",
+  usernamePlaceholder: "e.g. satoshi",
   displayName: "Display name",
   emailOptional: "Email (optional)",
   password: "Password",
@@ -524,7 +525,7 @@ const en = {
   authPassShort: "Password needs at least 6 characters",
   authSignupFailed: "Sign up failed",
   authWrongCreds: "Wrong username or password",
-  authWelcome: "Welcome to MonoBet — Ɱ 1,000 credited",
+  authWelcome: "Welcome to MonoPredict — Ɱ 1,000 credited",
   createAccountBtn: "Create account — get Ɱ 1,000",
   authPlayMoney: "Play money only. No deposits, no withdrawals, no regrets.",
 
@@ -532,7 +533,7 @@ const en = {
   tagline: "Play-money prediction markets for friends. Bet virtual Monos on anything — no deposits, no withdrawals, no regrets.",
   playMoneyDisclaimer: "Play money only. Not financial advice — not even real money.",
   legalNotice:
-    "MonoBet is a demo project made for fun. Monos (Ɱ) are virtual play money with no monetary value — they cannot be bought, sold, deposited, or withdrawn. This is not a real prediction market, betting service, or financial product.",
+    "MonoPredict is a demo project made for fun. Monos (Ɱ) are virtual play money with no monetary value — they cannot be bought, sold, deposited, or withdrawn. This is not a real prediction market, betting service, or financial product.",
   openSource: "Open source",
 
   // terms of use
@@ -543,7 +544,7 @@ const en = {
   termsSub: "The short version: this is a toy. Have fun.",
   termsS1T: "Made for fun, not for real",
   termsS1B:
-    "MonoBet is a personal demo project built for entertainment. Nothing here is a real prediction market, betting service, exchange, or financial product. Market outcomes, prices, and payouts are simulated by software.",
+    "MonoPredict is a personal demo project built for entertainment. Nothing here is a real prediction market, betting service, exchange, or financial product. Market outcomes, prices, and payouts are simulated by software.",
   termsS2T: "Virtual Monos only",
   termsS2B:
     "Monos (Ɱ) are virtual play money. They have no monetary value and cannot be bought, sold, deposited, withdrawn, exchanged, or redeemed for anything. Winning or losing Monos means nothing outside this site.",
@@ -558,7 +559,7 @@ const en = {
     "The site is provided as-is, with no warranty of any kind. Balances, markets, comments, and accounts can be wiped or reset at any time without notice. The project may change or disappear entirely.",
   termsS6T: "Open source",
   termsS6B:
-    "MonoBet is open source under the MIT license. Questions or issues: github.com/Dvorinka/monobet.",
+    "MonoPredict is open source under the MIT license. Questions or issues: github.com/Dvorinka/monobet.",
 
   // 404
   notFoundTitle: "404 — off the chart",
@@ -660,7 +661,7 @@ const en = {
   bonusInstagram: "Follow on Instagram",
   bonusInstagramDesc: "@tdvorak.dev on Instagram.",
   bonusGithub: "Star on GitHub",
-  bonusGithubDesc: "MonoBet is open source.",
+  bonusGithubDesc: "MonoPredict is open source.",
   bonusFirstBet: "First trade",
   bonusFirstBetDesc: "Buy your first shares on any market.",
   bonusFirstMarket: "Market maker",
@@ -1111,7 +1112,7 @@ const cs: Dict = {
   relatedMarkets: "Související trhy",
   resolverNote: "Uzavírá tvůrce nebo administrátor",
   watchTrailer: "Přehrát trailer",
-  welcomeTitle: "Vítej na MonoBetu",
+  welcomeTitle: "Vítej na MonoPredictu",
   welcomeSub: "Virtuální predikční trhy — jen hrací peníze.",
   option: "Možnost",
   allClosed: "Všechny možnosti jsou uzavřené.",
@@ -1508,6 +1509,7 @@ const cs: Dict = {
   loginSub: "Sázejte virtuální Mony na vlastní události.",
   signupSub: "Ɱ 1 000 hracích peněz při registraci. Žádné skutečné peníze.",
   username: "Uživatelské jméno",
+  usernamePlaceholder: "např. jan.novak",
   displayName: "Zobrazované jméno",
   emailOptional: "E-mail (nepovinný)",
   password: "Heslo",
@@ -1522,14 +1524,14 @@ const cs: Dict = {
   authPassShort: "Heslo musí mít alespoň 6 znaků",
   authSignupFailed: "Registrace selhala",
   authWrongCreds: "Špatné jméno nebo heslo",
-  authWelcome: "Vítejte v MonoBet — připsáno Ɱ 1 000",
+  authWelcome: "Vítejte na MonoPredictu — připsáno Ɱ 1 000",
   createAccountBtn: "Vytvořit účet — získat Ɱ 1 000",
   authPlayMoney: "Pouze hrací peníze. Bez vkladů, bez výběrů, bez lítosti.",
 
   tagline: "Predikční trhy pro přátele za hrací peníze. Sázejte virtuální Mony na cokoli — bez vkladů, bez výběrů, bez lítosti.",
   playMoneyDisclaimer: "Pouze hrací peníze. Není to finanční rada — ani skutečné peníze to nejsou.",
   legalNotice:
-    "MonoBet je demo projekt pro zábavu. Mony (Ɱ) jsou virtuální herní peníze bez jakékoli hodnoty — nelze je koupit, prodat, vložit ani vybrat. Nejedná se o skutečný predikční trh, sázkovou službu ani finanční produkt.",
+    "MonoPredict je demo projekt pro zábavu. Mony (Ɱ) jsou virtuální herní peníze bez jakékoli hodnoty — nelze je koupit, prodat, vložit ani vybrat. Nejedná se o skutečný predikční trh, sázkovou službu ani finanční produkt.",
   openSource: "Open source",
 
   terms: "Podmínky",
@@ -1539,7 +1541,7 @@ const cs: Dict = {
   termsSub: "Krátká verze: tohle je hračka. Bavte se.",
   termsS1T: "Pro zábavu, ne doopravdy",
   termsS1B:
-    "MonoBet je osobní demo projekt vytvořený pro zábavu. Nic zde není skutečný predikční trh, sázková služba, burza ani finanční produkt. Výsledky trhů, ceny a výplaty simuluje software.",
+    "MonoPredict je osobní demo projekt vytvořený pro zábavu. Nic zde není skutečný predikční trh, sázková služba, burza ani finanční produkt. Výsledky trhů, ceny a výplaty simuluje software.",
   termsS2T: "Pouze virtuální Mony",
   termsS2B:
     "Mony (Ɱ) jsou virtuální herní peníze. Nemají žádnou peněžní hodnotu a nelze je koupit, prodat, vložit, vybrat, směnit ani uplatnit za cokoli. Výhra nebo prohra Monů nic neznamená mimo tyto stránky.",
@@ -1554,7 +1556,7 @@ const cs: Dict = {
     "Web je poskytován tak, jak je, bez jakékoli záruky. Zůstatky, trhy, komentáře a účty mohou být kdykoli vymazány nebo resetovány bez upozornění. Projekt se může změnit nebo zcela zmizet.",
   termsS6T: "Open source",
   termsS6B:
-    "MonoBet je open source pod licencí MIT. Dotazy nebo problémy: github.com/Dvorinka/monobet.",
+    "MonoPredict je open source pod licencí MIT. Dotazy nebo problémy: github.com/Dvorinka/monobet.",
 
   notFoundTitle: "404 — mimo graf",
   notFoundBody: "Tato stránka se vyhodnotila jako NE. Nebo možná nikdy neexistovala.",
@@ -1654,7 +1656,7 @@ const cs: Dict = {
   bonusInstagram: "Instagram",
   bonusInstagramDesc: "@tdvorak.dev na Instagramu.",
   bonusGithub: "Hvězda na GitHubu",
-  bonusGithubDesc: "MonoBet je open source.",
+  bonusGithubDesc: "MonoPredict je open source.",
   bonusFirstBet: "První sázka",
   bonusFirstBetDesc: "Kupte si první akcie na libovolném trhu.",
   bonusFirstMarket: "Tvůrce trhů",

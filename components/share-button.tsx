@@ -19,7 +19,7 @@ export function ShareButton({
   lang?: Lang;
   className?: string;
 }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLDivElement>(null);

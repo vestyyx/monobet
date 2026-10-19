@@ -17,7 +17,7 @@ function fmtCountdown(ms: number) {
 // Both states just link to /rewards; the real claim button lives there.
 export function ClaimButton({ lang, nextAt }: { lang?: Lang; nextAt: number | null }) {
   const [now, setNow] = useState(() => Date.now());
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
 
   useEffect(() => {
     if (!nextAt || nextAt <= Date.now()) return;

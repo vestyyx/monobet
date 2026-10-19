@@ -85,7 +85,7 @@ export function Comments({
   const [pending, start] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
 
   // One level of threading: replies group under their top-level parent.
   const topLevel = comments.filter((c) => !c.parentId);
@@ -269,7 +269,7 @@ function CommentItem({
   replySlot?: (text: string) => Promise<boolean>;
   badge?: CommentBadge;
 }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const [replying, setReplying] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [editing, setEditing] = useState(false);

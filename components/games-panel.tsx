@@ -96,7 +96,7 @@ const readFxOff = () => {
 };
 
 function useGame(lang?: Lang) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const [pending, start] = useTransition();
   const router = useRouter();
   // Server error strings -> localized text; unknown strings pass through.
@@ -125,7 +125,7 @@ function ResultTag({ net, lang }: { net: Net; lang?: Lang }) {
     if (net) playSfx(net.won ? "win" : net.netCents === -(net.feeCents ?? 0) ? "trade" : "lose", 0.5);
   }, [net]);
   if (!net) return null;
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   // Headline = the win itself (stake + profit, before any debt garnish). A
   // debtor's profit may route to their loan, so a separate line shows what
   // actually landed on the balance — otherwise "+stake back" reads as
@@ -232,7 +232,7 @@ function BetControls({
   // Effective base-stake ceiling in cents (global or per-game override).
   maxBet?: number;
 }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const betCents = Math.round(parseFloat(bet || "0") * 100);
   const cap = levCap ?? GAME_LEVERAGES[GAME_LEVERAGES.length - 1];
   const bps = feeBps ?? LEV_FEE_BPS;
@@ -354,7 +354,7 @@ function AutoBar({
   lang?: Lang;
   onRunning?: (running: boolean) => void;
 }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const [open, setOpen] = useState(false);
   const [rounds, setRounds] = useState("10");
   const [stopWin, setStopWin] = useState("");
@@ -474,7 +474,7 @@ function GameCard({
 type GameProps = { balanceCents: number; lang?: Lang; dealerId?: string; inDebt?: boolean; demo?: boolean; onWinFx?: (amt: number, fx: WinFx, tavCents?: number) => void; levCap?: number; feeBps?: number; maxBet?: number; autobet?: boolean };
 
 function CoinFlipCard({ balanceCents, lang, dealerId, inDebt, demo, onWinFx, levCap, feeBps, maxBet, autobet }: GameProps) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const { pending, run } = useGame(lang);
   const [pick, setPick] = useState<"heads" | "tails">("heads");
   const [bet, setBet] = useState("10");
@@ -591,7 +591,7 @@ function DiceFace({ value, rolling }: { value: number; rolling: boolean }) {
 }
 
 function DiceCard({ balanceCents, lang, dealerId, inDebt, demo, onWinFx, levCap, feeBps, maxBet, autobet }: GameProps) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const { pending, run } = useGame(lang);
   const [over, setOver] = useState(3);
   const [bet, setBet] = useState("10");
@@ -729,7 +729,7 @@ function TimerDigits({ phase, clockRef, frozen, targetMs, lang }: {
 }
 
 function TimerCard({ balanceCents, lang, dealerId, inDebt, onWinFx, levCap, feeBps, maxBet, autobet }: GameProps) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const { pending, run } = useGame(lang);
   const [target, setTarget] = useState(String(TIMER_TARGETS[0] / 1000));
   const [bet, setBet] = useState("10");
@@ -823,7 +823,7 @@ function TimerCard({ balanceCents, lang, dealerId, inDebt, onWinFx, levCap, feeB
       sub={t.gTimerSub}
       stage={
         <div className="flex flex-col items-center gap-2">
-          <TimerDigits key={round} phase={phase} clockRef={t0} frozen={frozen} targetMs={targetMs} lang={lang ?? "en"} />
+          <TimerDigits key={round} phase={phase} clockRef={t0} frozen={frozen} targetMs={targetMs} lang={lang ?? "cs"} />
           {phase === "done" && miss && (
             <div className="num text-[11.5px] text-mute">
               {(miss.elapsed / 1000).toFixed(2)}s · {t.offBy(miss.err)}
@@ -902,7 +902,7 @@ function TimerCard({ balanceCents, lang, dealerId, inDebt, onWinFx, levCap, feeB
 // ---------- limbo ----------
 
 function LimboCard({ balanceCents, lang, dealerId, inDebt, demo, onWinFx, levCap, feeBps, maxBet, autobet }: GameProps) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const { pending, run } = useGame(lang);
   const [target, setTarget] = useState(2);
   const [bet, setBet] = useState("10");
@@ -1035,7 +1035,7 @@ function wheelColor(m: number, i: number) {
 }
 
 function WheelCard({ balanceCents, lang, dealerId, inDebt, demo, onWinFx, levCap, feeBps, maxBet, autobet }: GameProps) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const { pending, run } = useGame(lang);
   const [bet, setBet] = useState("10");
   const [lev, setLev] = useState("1");
@@ -1168,7 +1168,7 @@ function buildStrip(prevSym: number, final: number): number[] {
 }
 
 function SlotsCard({ balanceCents, lang, dealerId, inDebt, demo, onWinFx, levCap, feeBps, maxBet, autobet }: GameProps) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const { pending, run } = useGame(lang);
   const [bet, setBet] = useState("10");
   const [lev, setLev] = useState("1");
@@ -1376,7 +1376,7 @@ type BjStep = "p" | "d" | "hole";
 const BJ_REVEAL_MS = 460;
 
 function BlackjackCard({ balanceCents, lang, dealerId, inDebt, onWinFx, levCap, feeBps, maxBet, autobet }: GameProps) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const { pending, run } = useGame(lang);
   const [bet, setBet] = useState("10");
   const [lev, setLev] = useState("1");
@@ -1722,7 +1722,7 @@ const PK_MAX_BALLS = 16;
 const PK_MAX_AIRBORNE = 8;
 
 function PlinkoCard({ balanceCents, lang, dealerId, inDebt, demo, onWinFx, levCap, feeBps, maxBet, autobet }: GameProps) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const { pending, run } = useGame(lang);
   const [bet, setBet] = useState("10");
   const [lev, setLev] = useState("1");
@@ -1903,7 +1903,7 @@ function BigCard({ v, hidden }: { v?: number; hidden?: boolean }) {
 }
 
 function RedBlackCard({ balanceCents, lang, dealerId, inDebt, demo, onWinFx, levCap, feeBps, maxBet, autobet }: GameProps) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const { pending, run } = useGame(lang);
   const [pick, setPick] = useState<"red" | "black">("red");
   const [bet, setBet] = useState("10");
@@ -1994,7 +1994,7 @@ function RedBlackCard({ balanceCents, lang, dealerId, inDebt, demo, onWinFx, lev
 }
 
 function HiLoCard({ balanceCents, lang, dealerId, inDebt, demo, onWinFx, levCap, feeBps, maxBet, autobet }: GameProps) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const { pending, run } = useGame(lang);
   const [bet, setBet] = useState("10");
   const [lev, setLev] = useState("1");
@@ -2156,7 +2156,7 @@ export type GameSlug = keyof typeof GAME_COMPONENTS;
 // splat with radiating fingers and stray droplets, then the mass sticks and
 // slides down off the screen.
 function BonnieSplash({ amountCents, lang }: { amountCents: number; lang?: Lang }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   return (
     <div className="absolute inset-0 grid place-items-center overflow-hidden pointer-events-none" role="status" aria-live="polite">
       <div className="anim-pie-out relative" style={{ width: "44vmin", height: "44vmin" }}>
@@ -2226,7 +2226,7 @@ function JetSvg() {
 }
 
 function PlaneSplash({ amountCents, lang }: { amountCents: number; lang?: Lang }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   return (
     <div className="anim-plane-veil absolute inset-0 overflow-hidden bg-[#0b1d33]" role="status" aria-live="polite">
       {/* Bounded aerial frame — a framed approach-cam photo with margins,
@@ -2282,7 +2282,7 @@ const CONFETTI = Array.from({ length: 42 }, (_, i) => ({
 }));
 
 function PrideSplash({ amountCents, lang }: { amountCents: number; lang?: Lang }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   return (
     <div className="anim-pride-veil absolute inset-0 overflow-hidden pointer-events-none bg-[#170a24]" role="status" aria-live="polite">
       {/* Bounded flag on a pole — the cloth waves center-stage instead of
@@ -2335,7 +2335,7 @@ const MONEY_RAIN = Array.from({ length: 56 }, (_, i) => ({
 }));
 
 function ShekelSplash({ amountCents, tavCents, lang }: { amountCents: number; tavCents?: number; lang?: Lang }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   return (
     <div className="anim-shekel-veil absolute inset-0 overflow-hidden pointer-events-none bg-[#0c1428]" role="status" aria-live="polite">
       {/* Bounded flag banner — the white field with blue bands is an inset
@@ -2410,7 +2410,7 @@ export function GameView({
   // Admin kill-switch — when off, no card renders the AutoBar.
   autobet?: boolean;
 }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const Game = GAME_COMPONENTS[game];
   const [dealerId, setDealerId] = useState<string>();
   const [splash, setSplash] = useState<{ amt: number; fx: WinFx; tav?: number } | null>(null);

@@ -15,7 +15,7 @@ export type TradeRow = {
 };
 
 export function ActivityFeed({ trades, lang }: { trades: TradeRow[]; lang?: Lang }) {
-  const tt = getT(lang ?? "en");
+  const tt = getT(lang ?? "cs");
   if (trades.length === 0) {
     return <p className="text-[13px] text-faint py-4">{tt.noTradesYet}</p>;
   }

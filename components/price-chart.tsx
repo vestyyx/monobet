@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { TrendingDown, TrendingUp } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, openPct } from "@/lib/utils";
 import { AnimatedPct } from "@/components/animated-number";
 import { LOCALES, getT, type Lang } from "@/lib/i18n";
 import { fmtMonos } from "@/lib/money";
@@ -74,8 +74,8 @@ function fmtTick(t: number, span: number, locale: string): string {
 }
 
 export function PriceChart({ points, now, live, lang, trades }: { points: Pt[]; now: number; live?: boolean; lang?: Lang; trades?: ChartMarker[] }) {
-  const locale = LOCALES[lang ?? "en"];
-  const t = getT(lang ?? "en");
+  const locale = LOCALES[lang ?? "cs"];
+  const t = getT(lang ?? "cs");
   const [range, setRange] = useState<(typeof RANGES)[number]["key"]>("ALL");
   const [hover, setHover] = useState<number | null>(null);
   const [mark, setMark] = useState<number | null>(null);
@@ -142,7 +142,7 @@ export function PriceChart({ points, now, live, lang, trades }: { points: Pt[]; 
       <div className="flex items-center justify-between flex-wrap gap-x-3 gap-y-2 mb-2">
         <div className="num flex items-center gap-2.5">
           <AnimatedPct
-            value={last?.p ?? 0}
+            value={live && last ? openPct(last.p) / 100 : last?.p ?? 0}
             className="text-[34px] font-bold tracking-tight leading-none"
           />
           <span className="text-[13px] font-medium text-mute">{t.chance}</span>
@@ -161,7 +161,7 @@ export function PriceChart({ points, now, live, lang, trades }: { points: Pt[]; 
           {live && (
             <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-mute">
               <span className="live-dot" />
-              Live
+              {t.live}
             </span>
           )}
         </div>
@@ -175,7 +175,7 @@ export function PriceChart({ points, now, live, lang, trades }: { points: Pt[]; 
                 range === r.key ? "bg-surface shadow-sm text-ink" : "text-mute hover:text-ink"
               )}
             >
-              {RANGE_LABEL[lang ?? "en"][r.key]}
+              {RANGE_LABEL[lang ?? "cs"][r.key]}
             </button>
           ))}
         </div>

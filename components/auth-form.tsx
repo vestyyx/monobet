@@ -18,7 +18,7 @@ type Inviter = { username: string; name: string; image: string | null } | null;
 
 export function AuthForm({ lang, inviter }: { lang?: Lang; inviter?: Inviter }) {
   const params = useSearchParams();
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const [mode, setMode] = useState<"login" | "signup">(
     params.get("mode") === "signup" || params.get("ref") ? "signup" : "login"
   );
@@ -72,7 +72,7 @@ export function AuthForm({ lang, inviter }: { lang?: Lang; inviter?: Inviter }) 
     <Card className="p-6">
       <div className="flex items-center gap-2 mb-6">
         <LogoMark />
-        <span className="font-bold text-[17px] tracking-tight">MonoBet</span>
+        <span className="font-bold text-[17px] tracking-tight">MonoPredict</span>
       </div>
 
       <Segmented
@@ -128,7 +128,7 @@ export function AuthForm({ lang, inviter }: { lang?: Lang; inviter?: Inviter }) 
             id="u"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            placeholder="e.g. satoshi"
+            placeholder={t.usernamePlaceholder}
             autoComplete="username"
             className="mt-1"
           />

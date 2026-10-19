@@ -28,7 +28,7 @@ export function MobileNav({
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const router = useRouter();
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -73,12 +73,12 @@ export function MobileNav({
           <Link href="/leaderboard" className={item} onClick={() => setOpen(false)}>
             {t.leaderboard}
           </Link>
-          <Link href="/games" className={item} onClick={() => setOpen(false)}>
+          {/* <Link href="/games" className={item} onClick={() => setOpen(false)}>
             {t.games}
-          </Link>
-          <Link href="/duels" className={item} onClick={() => setOpen(false)}>
+          </Link> */}
+          {/* <Link href="/duels" className={item} onClick={() => setOpen(false)}>
             {t.duelsTitle}
-          </Link>
+          </Link> */}
           <Link href="/squads" className={item} onClick={() => setOpen(false)}>
             {t.squadsTitle}
           </Link>

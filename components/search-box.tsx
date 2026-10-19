@@ -9,7 +9,7 @@ export function SearchBox({ lang }: { lang?: Lang }) {
   const router = useRouter();
   const params = useSearchParams();
   const q = params.get("q") ?? "";
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const [open, setOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
