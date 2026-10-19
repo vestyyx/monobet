@@ -10,7 +10,7 @@ export function fmtMonos(cents: number, opts?: { decimals?: boolean; lang?: Lang
   return (
     sign +
     "Ɱ " +
-    abs.toLocaleString(LOCALES[opts?.lang ?? "en"], {
+    abs.toLocaleString(LOCALES[opts?.lang ?? "cs"], {
       minimumFractionDigits: showDecimals ? 2 : 0,
       maximumFractionDigits: showDecimals ? 2 : 0,
     })
@@ -42,11 +42,11 @@ export function fmtPct(p: number): string {
 }
 
 export function fmtShares(n: number, lang?: Lang): string {
-  return n.toLocaleString(LOCALES[lang ?? "en"], { maximumFractionDigits: 2 });
+  return n.toLocaleString(LOCALES[lang ?? "cs"], { maximumFractionDigits: 2 });
 }
 
 export function timeAgo(d: Date | string, lang?: Lang): string {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const s = Math.floor((Date.now() - new Date(d).getTime()) / 1000);
   if (s < 60) return t.agoS(s);
   if (s < 3600) return t.agoM(Math.floor(s / 60));
@@ -63,7 +63,7 @@ export function fmtCountdown(until: Date | string): string {
 
 export function fmtDate(d: Date | string | null | undefined, lang?: Lang): string {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString(LOCALES[lang ?? "en"], {
+  return new Date(d).toLocaleDateString(LOCALES[lang ?? "cs"], {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -74,7 +74,7 @@ export function fmtDate(d: Date | string | null | undefined, lang?: Lang): strin
 // splits across midnight between UTC SSR and the viewer's timezone.
 export function fmtDateTime(d: Date | string | null | undefined, lang?: Lang): string {
   if (!d) return "—";
-  return new Date(d).toLocaleString(LOCALES[lang ?? "en"], {
+  return new Date(d).toLocaleString(LOCALES[lang ?? "cs"], {
     month: "short",
     day: "numeric",
     year: "numeric",

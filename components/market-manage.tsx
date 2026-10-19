@@ -50,7 +50,7 @@ export function MarketManagePanel({
   isAdmin?: boolean;
   lang?: Lang;
 }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const router = useRouter();
   const [pending, start] = useTransition();
   const [editing, setEditing] = useState(false);

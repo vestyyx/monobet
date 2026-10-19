@@ -18,7 +18,7 @@ export function DeleteMarketButton({
   admin: boolean;
   lang?: Lang;
 }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const [pending, start] = useTransition();
   const router = useRouter();
   return (

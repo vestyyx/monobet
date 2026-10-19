@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "MonoBet — play-money prediction markets";
+export const alt = "MonoPredict — play-money prediction markets";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 export const dynamic = "force-static";
@@ -32,7 +32,7 @@ export default function Image() {
             />
             <circle cx="198" cy="60" r="22" fill="#0f9d58" />
           </svg>
-          <div style={{ fontSize: 40, fontWeight: 700, color: "#ffffff" }}>MonoBet</div>
+          <div style={{ fontSize: 40, fontWeight: 700, color: "#ffffff" }}>MonoPredict</div>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>

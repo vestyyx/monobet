@@ -56,7 +56,7 @@ function writeState(userId: string, state: NotifState) {
 }
 
 export function NotifBell({ items: ssrItems, userId, lang }: { items: NotifItem[]; userId: string; lang?: Lang }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const [open, setOpen] = useState(false);
   const [polled, setPolled] = useState<NotifItem[]>([]);
   const ref = useRef<HTMLDivElement>(null);

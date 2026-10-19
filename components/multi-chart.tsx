@@ -108,8 +108,8 @@ export function MultiPriceChart({
   trades?: ChartMarker[];
   onSelectKey?: (key: string) => void;
 }) {
-  const t = getT(lang ?? "en");
-  const locale = LOCALES[lang ?? "en"];
+  const t = getT(lang ?? "cs");
+  const locale = LOCALES[lang ?? "cs"];
   const [range, setRange] = useState<(typeof RANGES)[number]["key"]>("ALL");
   const [hoverT, setHoverT] = useState<number | null>(null);
   const [mark, setMark] = useState<number | null>(null);
@@ -217,7 +217,7 @@ export function MultiPriceChart({
                 range === r.key ? "bg-surface shadow-sm text-ink" : "text-mute hover:text-ink"
               )}
             >
-              {RANGE_LABEL[lang ?? "en"][r.key]}
+              {RANGE_LABEL[lang ?? "cs"][r.key]}
             </button>
           ))}
         </div>

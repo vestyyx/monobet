@@ -55,7 +55,7 @@ import { MarketManagePanel } from "@/components/market-manage";
 import { ResolutionPanel } from "@/components/resolution-panel";
 import { NoteStanceBar } from "@/components/note-stance-bar";
 import { optionColor } from "@/lib/option-style";
-import { cn } from "@/lib/utils";
+import { cn, openPct } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -74,9 +74,13 @@ export async function generateMetadata({
   if (m?.parentId) {
     const sibs = (await getGroupOptions(m.parentId)).filter((o) => o.status === "live");
     const i = sibs.findIndex((s) => s.id === m.id);
-    if (i >= 0) pct = Math.round(multiPrices(multiCoords(sibs.map((s) => ({ qYes: Number(s.qYes), qNo: Number(s.qNo) }))), m.b)[i] * 100);
+    if (i >= 0) {
+      const price = multiPrices(multiCoords(sibs.map((s) => ({ qYes: Number(s.qYes), qNo: Number(s.qNo) }))), m.b)[i];
+      pct = m.status === "live" ? openPct(price) : Math.round(price * 100);
+    }
   } else if (m && m.kind !== "group") {
-    pct = Math.round(marketYesPrice(m) * 100);
+    const price = marketYesPrice(m);
+    pct = m.status === "live" ? openPct(price) : Math.round(price * 100);
   }
   // Group parents hold seed volume only — the real number is the sum of
   // option volumes, same as the page header and OG image.
@@ -86,9 +90,9 @@ export async function generateMetadata({
     title: m?.question ?? "Market",
     description: m
       ? m.kind === "group"
-        ? `${fmtMonos(shownVolume)} traded on MonoBet — play-money markets`
-        : `${pct}% YES · ${fmtMonos(shownVolume)} traded on MonoBet — play-money markets`
-      : "MonoBet market",
+        ? `${fmtMonos(shownVolume)} traded on MonoPredict — play-money markets`
+        : `${pct}% YES · ${fmtMonos(shownVolume)} traded on MonoPredict — play-money markets`
+      : "MonoPredict market",
     openGraph: m ? { title: m.question } : undefined,
   };
 }
@@ -575,7 +579,7 @@ export default async function MarketPage({ params, searchParams }: { params: Pro
                     <MarketIcon market={m} size="size-8" />
                     <span className="min-w-0 flex-1 text-[13px] font-medium leading-snug line-clamp-2">{m.question}</span>
                     <span className="num text-[13px] font-bold text-ink-2 shrink-0">
-                      {Math.round(marketYesPrice(m) * 100)}%
+                      {m.status === "live" ? openPct(marketYesPrice(m)) : Math.round(marketYesPrice(m) * 100)}%
                     </span>
                   </Link>
                 ))}
@@ -985,7 +989,7 @@ async function GroupMarketView({
                       <MarketIcon market={m} size="size-8" />
                       <span className="min-w-0 flex-1 text-[13px] font-medium leading-snug line-clamp-2">{m.question}</span>
                       <span className="num text-[13px] font-bold text-ink-2 shrink-0">
-                        {Math.round(marketYesPrice(m) * 100)}%
+                        {m.status === "live" ? openPct(marketYesPrice(m)) : Math.round(marketYesPrice(m) * 100)}%
                       </span>
                     </Link>
                   ))}

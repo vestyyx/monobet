@@ -74,8 +74,8 @@ function fmtTick(t: number, span: number, locale: string): string {
 }
 
 export function PriceChart({ points, now, live, lang, trades }: { points: Pt[]; now: number; live?: boolean; lang?: Lang; trades?: ChartMarker[] }) {
-  const locale = LOCALES[lang ?? "en"];
-  const t = getT(lang ?? "en");
+  const locale = LOCALES[lang ?? "cs"];
+  const t = getT(lang ?? "cs");
   const [range, setRange] = useState<(typeof RANGES)[number]["key"]>("ALL");
   const [hover, setHover] = useState<number | null>(null);
   const [mark, setMark] = useState<number | null>(null);
@@ -175,7 +175,7 @@ export function PriceChart({ points, now, live, lang, trades }: { points: Pt[]; 
                 range === r.key ? "bg-surface shadow-sm text-ink" : "text-mute hover:text-ink"
               )}
             >
-              {RANGE_LABEL[lang ?? "en"][r.key]}
+              {RANGE_LABEL[lang ?? "cs"][r.key]}
             </button>
           ))}
         </div>

@@ -46,7 +46,7 @@ export function WallCard({
   now: number;
   balanceCents: number;
 }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const router = useRouter();
   const [pending, start] = useTransition();
   const [note, setNote] = useState("");

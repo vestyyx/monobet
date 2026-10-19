@@ -50,7 +50,7 @@ export async function SiteHeader() {
         <MobileNav lang={lang} signedIn={!!user} username={user?.username ?? user?.name} isAdminUser={!!user && isAdmin(user)} claimableCents={claimableCents} />
         <Link href="/" className="flex items-center gap-2 shrink-0 group/logo">
           <LogoMark className="transition-transform duration-300 group-hover/logo:rotate-[-6deg] group-hover/logo:scale-105" />
-          <span className="font-bold text-[17px] tracking-tight hidden sm:block">MonoBet</span>
+          <span className="font-bold text-[17px] tracking-tight hidden sm:block">MonoPredict</span>
         </Link>
 
         <nav className="hidden md:flex items-center gap-1 text-[13.5px] font-medium text-mute">
@@ -60,9 +60,9 @@ export async function SiteHeader() {
           <Link href="/leaderboard" className="px-2.5 py-1.5 rounded-md hover:text-ink hover:bg-surface-2">
             {t.leaderboard}
           </Link>
-          <Link href="/games" className="px-2.5 py-1.5 rounded-md hover:text-ink hover:bg-surface-2">
+          {/* <Link href="/games" className="px-2.5 py-1.5 rounded-md hover:text-ink hover:bg-surface-2">
             {t.games}
-          </Link>
+          </Link> */}
         </nav>
 
         <div className="ml-auto sm:flex-1 sm:max-w-sm">

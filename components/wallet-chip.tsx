@@ -23,7 +23,7 @@ export function WalletChip({
   debtCents: number;
   lang?: Lang;
 }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const router = useRouter();
   const [balance, setBalance] = useState(ssrBalance);
   const [debt, setDebt] = useState(ssrDebt);

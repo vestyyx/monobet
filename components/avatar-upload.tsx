@@ -39,7 +39,7 @@ export function AvatarUpload({
   const [pending, start] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
 
   const save = (img: string | null) =>
     start(async () => {

@@ -6,7 +6,7 @@ import { getT, isLang, LANG_COOKIE, LANGS, type Lang } from "@/lib/i18n";
 
 function readLang(): Lang {
   const m = document.cookie.match(new RegExp(`(?:^|; )${LANG_COOKIE}=([^;]*)`));
-  return isLang(m?.[1]) ? m[1] : "en";
+  return isLang(m?.[1]) ? m[1] : "cs";
 }
 
 const noop = () => () => {};
@@ -16,7 +16,7 @@ const noop = () => () => {};
 // the server re-render happens inside a transition so the click never blocks.
 export function LangToggle() {
   const router = useRouter();
-  const cookieLang = useSyncExternalStore(noop, readLang, () => "en" as Lang);
+  const cookieLang = useSyncExternalStore(noop, readLang, () => "cs" as Lang);
   const [optimistic, setOptimistic] = useState<Lang | null>(null);
   const [, startTransition] = useTransition();
   const lang = optimistic ?? cookieLang;

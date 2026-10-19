@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-// MonoBet glyph: a market price line zigzag terminating in the green quote dot.
+// MonoPredict glyph: a market price line zigzag terminating in the green quote dot.
 export function LogoMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 256 256" className={cn("size-7 shrink-0", className)} aria-hidden>
@@ -22,7 +22,7 @@ export function LogoLockup({ className, wordmark = true }: { className?: string;
   return (
     <span className={cn("inline-flex items-center gap-2", className)}>
       <LogoMark />
-      {wordmark && <span className="font-bold text-[17px] tracking-tight hidden sm:block">MonoBet</span>}
+      {wordmark && <span className="font-bold text-[17px] tracking-tight hidden sm:block">MonoPredict</span>}
     </span>
   );
 }

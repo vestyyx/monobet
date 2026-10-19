@@ -9,7 +9,7 @@ type T = Awaited<ReturnType<typeof getGlobalTrades>>[number];
 // Scrolling "live bets" tape — pure CSS marquee, duplicated once for a
 // seamless loop. Pauses on hover; each item links to its market.
 export function TradeTicker({ trades, lang }: { trades: T[]; lang?: Lang }) {
-  const tt = getT(lang ?? "en");
+  const tt = getT(lang ?? "cs");
   if (trades.length === 0) return null;
   const items = [...trades, ...trades];
   return (

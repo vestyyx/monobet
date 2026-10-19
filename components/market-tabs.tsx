@@ -23,7 +23,7 @@ export function MarketTabs({
   holderCount?: number;
   lang?: Lang;
 }) {
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
   const [tab, setTab] = useState<TabKey>("comments");
   const btn = (key: TabKey, label: string, n?: number) => (
     <button

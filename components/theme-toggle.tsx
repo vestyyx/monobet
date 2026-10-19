@@ -15,7 +15,7 @@ const isDark = () => document.documentElement.classList.contains("dark");
 
 export function ThemeToggle({ lang }: { lang?: Lang }) {
   const dark = useSyncExternalStore(subscribe, isDark, () => false);
-  const t = getT(lang ?? "en");
+  const t = getT(lang ?? "cs");
 
   return (
     <button

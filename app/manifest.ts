@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "MonoBet",
-    short_name: "MonoBet",
+    name: "MonoPredict",
+    short_name: "MonoPredict",
     description: "Play-money prediction markets for friends. Virtual Monos only — nothing here has real value.",
     start_url: "/",
     display: "standalone",

@@ -14,10 +14,10 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://monobet.tdvorak.dev"),
-  title: { default: "MonoBet — Markets", template: "MonoBet — %s" },
-  description: "Play-money prediction markets. Bet virtual Monos on custom events.",
+  title: { default: "MonoPredict — Platforma pro kolektivní prognózování", template: "MonoPredict — %s" },
+  description: "MonoPredict — Platforma pro kolektivní prognózování",
   openGraph: {
-    siteName: "MonoBet",
+    siteName: "MonoPredict",
     type: "website",
   },
 };
@@ -30,7 +30,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const [lang, user] = await Promise.all([getLang(), getCurrentUser()]);
   const t = getT(lang);
   return (
-    <html lang={lang} className={inter.variable} suppressHydrationWarning>
+    <html lang="cs" className={inter.variable} suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -48,7 +48,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <div className="max-w-xs">
                 <div className="flex items-center gap-2">
                   <LogoMark className="size-6" />
-                  <span className="font-bold text-[15px] tracking-tight">MonoBet</span>
+                  <span className="font-bold text-[15px] tracking-tight">MonoPredict</span>
                 </div>
                 <p className="mt-3 text-[13px] text-mute leading-relaxed">
                   {t.tagline}
