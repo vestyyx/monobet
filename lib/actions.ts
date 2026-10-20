@@ -12,6 +12,7 @@ import { loanFor, liquidationValueCents, groupLiquidationValueCents, shouldLiqui
 import { toNum, credit, lockUser, lockMarket, checkLiquidations, checkGroupLiquidations, garnishDebt, runStops, runGroupStops, addDebt, releaseDebt, ping, sweepDebt, type Tx } from "@/lib/tx-market";
 import { resetEconomyTx } from "@/lib/economy-reset";
 import { accruedDebtCents, LOAN_PRESETS_CENTS, LOAN_OFFER_COUNT, LOAN_OFFER_TTL_MS, rollRateBps, DEBT_CAP_CENTS, GAME_DEBT_RATE_BPS } from "@/lib/loans";
+import { capJobPay, dishesPay, DISH_PAY_CENTS, genMathProblems, JOBS, mathAnswer, mathPay, type Job, type MathProblem } from "@/lib/jobs";
 import { marketYesPrice, getMarketBetCount, getStatsSince } from "@/lib/queries";
 import {
   DAILY_AMOUNT,
@@ -2978,6 +2979,95 @@ export async function playDice(input: {
     return { ok: true, won, roll, netCents, dealer, feeCents, skimCents, tavCents };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Roll failed" };
+  }
+}
+
+// ---------- jobs ----------
+
+export async function startJobShift(input: {
+  job: string;
+}): Promise<{ ok: boolean; error?: string; token?: string; problems?: MathProblem[] }> {
+  const startedAt = Date.now();
+  try {
+    const u = await requireUser();
+    if (!JOBS.includes(input.job as Job)) throw new Error("Bad job");
+    const job = input.job as Job;
+    const problems = job === "math" ? genMathProblems() : null;
+    const token = await db.transaction(async (tx) => {
+      await lockUser(tx, u.id);
+      const [recent] = await tx
+        .select({ n: sql<number>`count(*)::int` })
+        .from(schema.jobShift)
+        .where(and(eq(schema.jobShift.userId, u.id), gte(schema.jobShift.startedAt, new Date(startedAt - 3_000))));
+      if ((recent?.n ?? 0) > 0) throw new Error("Too fast");
+      const [shift] = await tx
+        .insert(schema.jobShift)
+        .values({ userId: u.id, job, payload: problems, startedAt: new Date(startedAt) })
+        .returning({ id: schema.jobShift.id });
+      return shift.id;
+    });
+    return { ok: true, token, ...(problems ? { problems } : {}) };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Start failed" };
+  }
+}
+
+export async function finishJobShift(input: {
+  token: string;
+  plates?: number;
+  answers?: (number | null)[];
+}): Promise<{ ok: boolean; error?: string; earnedCents?: number; grossCents?: number; capped?: boolean; correct?: number }> {
+  const finishedAt = Date.now();
+  try {
+    const u = await requireUser();
+    const result = await db.transaction(async (tx) => {
+      const [shift] = await tx
+        .update(schema.jobShift)
+        .set({ settledAt: new Date(finishedAt) })
+        .where(and(eq(schema.jobShift.id, input.token), eq(schema.jobShift.userId, u.id), isNull(schema.jobShift.settledAt)))
+        .returning();
+      if (!shift) throw new Error("Bad job token");
+      await lockUser(tx, u.id);
+
+      const elapsedMs = finishedAt - shift.startedAt.getTime();
+      const problems = shift.payload ?? [];
+      const answers = (Array.isArray(input.answers) ? input.answers : [])
+        .slice(0, problems.length)
+        .map((answer) => (typeof answer === "number" && Number.isFinite(answer) ? answer : null));
+      const correct = shift.job === "math"
+        ? problems.reduce((n, problem, i) => n + (answers[i] === mathAnswer(problem) ? 1 : 0), 0)
+        : undefined;
+      const grossCents =
+        shift.job === "dishes"
+          ? dishesPay(input.plates ?? 0, elapsedMs)
+          : shift.job === "math"
+            ? mathPay(problems, answers, elapsedMs)
+            : 0;
+      const [earned] = await tx
+        .select({ cents: sql<number>`coalesce(sum(${schema.ledger.amountCents}), 0)::bigint` })
+        .from(schema.ledger)
+        .where(
+          and(
+            eq(schema.ledger.userId, u.id),
+            eq(schema.ledger.kind, "job"),
+            gte(schema.ledger.createdAt, new Date(finishedAt - 24 * 60 * 60_000))
+          )
+        );
+      const earnedCents = capJobPay(grossCents, Number(earned?.cents ?? 0));
+      await tx.update(schema.jobShift).set({ earnedCents }).where(eq(schema.jobShift.id, shift.id));
+      if (earnedCents > 0) {
+        const memo =
+          shift.job === "dishes"
+            ? `Brigáda: mytí nádobí · ${Math.floor(grossCents / DISH_PAY_CENTS)} talířů`
+            : `Brigáda: doučování · ${correct ?? 0}/${problems.length}`;
+        await credit(tx, u.id, earnedCents, "job", null, memo);
+      }
+      return { earnedCents, grossCents, capped: earnedCents < grossCents, correct };
+    });
+    revalidatePath("/jobs");
+    return { ok: true, ...result };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Finish failed" };
   }
 }
 

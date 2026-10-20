@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import type { MathProblem } from "@/lib/jobs";
 import {
   pgTable,
   text,
@@ -299,6 +300,7 @@ export type LedgerKind =
   | "payout"
   | "refund"
   | "game"
+  | "job"
   | "liq"
   | "notify"
   | "duel"
@@ -461,6 +463,21 @@ export const timerRound = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("timer_round_user_idx").on(t.userId, t.createdAt)]
+);
+
+export const jobShift = pgTable(
+  "job_shift",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    job: text("job").notNull(),
+    payload: jsonb("payload").$type<MathProblem[]>(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+    settledAt: timestamp("settled_at", { withTimezone: true }),
+    earnedCents: integer("earned_cents").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("job_shift_user_idx").on(t.userId, t.createdAt)]
 );
 
 // Hi-Lo — the server deals the face card at start (stake charged), the

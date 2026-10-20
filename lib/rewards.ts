@@ -48,7 +48,7 @@ export const REFERRER_BONUS = 20_000;
 // and principal moves aren't earnings.
 export const REFERRAL_ROYALTY_BPS = 500;
 export const REFERRAL_ROYALTY_CAP_CENTS = 200_000; // Ɱ2,000 per invitee — lifetime cap
-export const REFERRAL_EARN_KINDS = ["signup", "claim", "weekly", "ad", "activity", "bonus", "game", "payout", "duel", "tav", "jackpot"] as const;
+export const REFERRAL_EARN_KINDS = ["signup", "claim", "weekly", "ad", "activity", "bonus", "game", "job", "payout", "duel", "tav", "jackpot"] as const;
 
 // Daily jackpot — 4% of game handle pools back into a pot drawn once a day.
 // Every Ɱ10 wagered buys a ticket; the draw weights entries by ticket count.

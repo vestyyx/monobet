@@ -73,6 +73,9 @@ export function MobileNav({
           <Link href="/leaderboard" className={item} onClick={() => setOpen(false)}>
             {t.leaderboard}
           </Link>
+          <Link href="/jobs" className={item} onClick={() => setOpen(false)}>
+            {t.jobs}
+          </Link>
           {/* <Link href="/games" className={item} onClick={() => setOpen(false)}>
             {t.games}
           </Link> */}
