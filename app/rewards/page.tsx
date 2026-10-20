@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/session";
 import { getLang } from "@/lib/lang-server";
@@ -47,6 +49,17 @@ export default async function RewardsPage() {
           <AnimatedMoney cents={user.balanceCents} lang={lang} />
         </div>
       </div>
+
+      <Link
+        href="/jobs"
+        className="mt-5 flex items-center justify-between gap-4 rounded-xl border border-line bg-surface p-4 transition-colors hover:bg-surface-2"
+      >
+        <div>
+          <div className="text-sm font-semibold">{t.jobsTitle}</div>
+          <div className="mt-0.5 text-[12.5px] text-mute">{t.jobsLinkDesc}</div>
+        </div>
+        <ArrowRight className="size-4 shrink-0 text-mute" />
+      </Link>
 
       <RewardsPanels
         lang={lang}

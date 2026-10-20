@@ -397,6 +397,20 @@ export async function getUserLedger(userId: string, limit = 50) {
     .limit(limit);
 }
 
+export async function getJobEarnedLast24h(userId: string, now = Date.now()): Promise<number> {
+  const [row] = await db
+    .select({ cents: sql<number>`coalesce(sum(${schema.ledger.amountCents}), 0)::bigint` })
+    .from(schema.ledger)
+    .where(
+      and(
+        eq(schema.ledger.userId, userId),
+        eq(schema.ledger.kind, "job"),
+        gte(schema.ledger.createdAt, new Date(now - 24 * 60 * 60_000))
+      )
+    );
+  return Number(row?.cents ?? 0);
+}
+
 // cache(): the leaderboard page, getSquads, and ensureSeason can all want the
 // board in one request — compute it once per request, not three times.
 export const getLeaderboard = cache(async () => {
@@ -930,7 +944,7 @@ export async function getPublicProfile(username: string) {
         and(
           eq(schema.ledger.userId, u.id),
           sql`${schema.ledger.amountCents} > 0`,
-          inArray(schema.ledger.kind, ["signup", "claim", "weekly", "ad", "bonus", "grant"]),
+          inArray(schema.ledger.kind, ["signup", "claim", "weekly", "ad", "bonus", "grant", "job"]),
           statsSince ? gte(schema.ledger.createdAt, statsSince) : undefined
         )
       ),
