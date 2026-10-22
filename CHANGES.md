@@ -4,6 +4,15 @@ This fork of **MonoBet** (upstream: https://github.com/Dvorinka/monobet) is bein
 
 ## Phase 2 — admin panel rebuild (in progress)
 
+### Games batch 1 — Daily Trivia + Closest Guess (committed)
+- New schema (migration `0052_fun-games-batch1.sql`): `trivia_question` (bilingual bank, one pinned question per UTC day — unique `shown_day`), `trivia_answer` (unique per user+question, race-safe double-answer proof), `guess_round` + `guess_entry` (unique per user+round), `user.trivia_streak`.
+- `lib/fun.ts` — party-game constants and pure math: difficulty rewards Ɱ100/150/200 × streak multiplier (+10% per consecutive correct answer, cap ×2), closest-guess window ±10%, value clamp. `lib/fun.test.ts` (9 unit tests).
+- `lib/actions-fun.ts` ("use server"): race-safe daily question pinning (first visitor of the day claims a bank row via conditional UPDATE + `FOR UPDATE SKIP LOCKED` + unique index), `triviaAnswer`, `guessList/guessEnter/guessSettle`, admin creators `adminFunCreateTriviaQuestion` / `adminFunCreateGuessRound` (role-gated via `assertRole`, audit rows in the same transaction). Frozen accounts are blocked from earning.
+- Player UI: `/games` hub (2 live cards + friendly "on the way" card), `/trivia` (streak meter, live payout preview, instant reveal), `/guess` (re-tunable tips, close countdown, winners after the reveal). Nav links re-added to header + mobile menu (CZ/EN).
+- Admin: `/admin/trivia` (question-bank curator — the bank's row order IS the daily schedule) and `/admin/guess` (open rounds, reveal/settle with payouts + entrant counts); both modules flipped to `built: true` in the registry, so the sidebar lights them up automatically.
+- Ledger kinds `trivia` and `guess` render CZ/EN in the wallet history and profile feed (older historical kinds kept).
+- tsc 0 errors, lint 0 errors, 48 tests passing (39 existing + 9 new).
+
 ### 2.1 Architecture + module registry (committed)
 - `lib/admin/rbac.ts` — role ladder **user → moderator → admin → owner** (super-admin email = owner), `requireRole`/`assertRole` as the single server-side gate for every admin endpoint.
 - `lib/admin/modules.ts` — **module registry**: markets, gigs, all planned family games, money, groups, moderation, approvals, economy, settings, audit-log — each with CZ/EN labels, icon, minimum role and delivery phase. Sidebar, dashboard quick links and section routing generate from it (adding/flagging a module updates the whole panel).

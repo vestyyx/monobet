@@ -39,6 +39,9 @@ export const user = pgTable("user", {
   lastClaimAt: timestamp("last_claim_at", { withTimezone: true }),
   // Consecutive daily claims inside the 48h streak window.
   claimStreak: integer("claim_streak").notNull().default(0),
+  // Consecutive correct Daily Trivia answers — feeds the streak multiplier
+  // (lib/fun.ts). Resets to 0 on a wrong answer.
+  triviaStreak: integer("trivia_streak").notNull().default(0),
   // Presence streak — UTC day the user was last seen, consecutive-day count,
   // and a throttled "last online" stamp for activity tracking.
   lastActiveDay: date("last_active_day", { mode: "string" }),
@@ -301,7 +304,12 @@ export type LedgerKind =
   | "repay"
   | "burn"
   | "debt"
-  | "transfer";
+  | "transfer"
+  | "trivia"
+  | "guess"
+  | "poll"
+  | "emoji"
+  | "quest";
 
 export const ledger = pgTable(
   "ledger",
@@ -573,3 +581,91 @@ export const configVersion = pgTable("config_version", {
 // Player restriction columns live on the user table above (Phase 1 groundwork
 // for money freeze + kid mode): frozenAt freezes balance ops; kidMode shrinks
 // limits; maxStakeCents overrides the platform stake cap for that player.
+
+// ---------- family games (the friendly corner) ----------
+// All games here are free-play party games: no stakes leave the player, only
+// small fixed Mony rewards flow out through the ledger. Content is bilingual
+// (CZ/EN columns) and rewards never read like winnings of a bet.
+
+// Daily trivia — one question per day for the whole platform. Questions come
+// from an admin-fed bank; the first visitor of the day "pins" one bank row by
+// claiming it for `shownDay` (conditional UPDATE = race-safe, see actions-fun).
+// A non-null shownDay is unique by construction below, so a day can never get
+// two questions even with concurrent pinners.
+export const triviaQuestion = pgTable(
+  "trivia_question",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    qCs: text("q_cs").notNull(),
+    qEn: text("q_en").notNull(),
+    optionsCs: jsonb("options_cs").$type<string[]>().notNull(),
+    optionsEn: jsonb("options_en").$type<string[]>().notNull(),
+    correctIdx: integer("correct_idx").notNull(), // 0-3
+    difficulty: integer("difficulty").notNull().default(1), // 1 easy Ɱ100 · 2 Ɱ150 · 3 Ɱ200
+    rewardCents: integer("reward_cents"), // override when set, else derived from difficulty
+    shownDay: date("shown_day", { mode: "string" }), // UTC day this question is/was live
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("trivia_bank_day_idx").on(t.shownDay)]
+);
+
+// One answer per player per question — the unique index makes double answers
+// impossible even if two requests race.
+export const triviaAnswer = pgTable(
+  "trivia_answer",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    questionId: uuid("question_id").notNull().references(() => triviaQuestion.id, { onDelete: "cascade" }),
+    chosen: integer("chosen").notNull(),
+    correct: boolean("correct").notNull(),
+    rewardCents: integer("reward_cents").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("trivia_answer_once_idx").on(t.userId, t.questionId),
+    index("trivia_answer_user_idx").on(t.userId, t.createdAt),
+  ]
+);
+
+// Closest guess — a friendly "how many pancakes will Dad eat?" estimation
+// round. Everyone may re-tune their number until closeAt; then an admin/back
+// reveals the real value and the closest entry wins the fixed reward, with a
+// small consolation for everyone inside the consolation window. Free to play.
+export const guessRound = pgTable(
+  "guess_round",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    promptCs: text("prompt_cs").notNull(),
+    promptEn: text("prompt_en").notNull(),
+    unitCs: text("unit_cs").notNull().default(""), // e.g. "papanců" — shown after numbers
+    unitEn: text("unit_en").notNull().default(""),
+    closeAt: timestamp("close_at", { withTimezone: true }).notNull(),
+    answerValue: bigint("answer_value", { mode: "number" }), // revealed at settle
+    status: text("status").notNull().default("open"), // open | settled
+    rewardCents: integer("reward_cents").notNull().default(20_000), // Ɱ200 for the closest
+    consolationCents: integer("consolation_cents").notNull().default(5_000), // within window
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    settledBy: text("settled_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("guess_round_status_idx").on(t.status, t.closeAt)]
+);
+
+export const guessEntry = pgTable(
+  "guess_entry",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    roundId: uuid("round_id").notNull().references(() => guessRound.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    value: bigint("value", { mode: "number" }).notNull(),
+    // Payout stamps filled at settle — 0 means no reward for this entry.
+    rewardCents: integer("reward_cents").notNull().default(0),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("guess_entry_once_idx").on(t.roundId, t.userId),
+    index("guess_entry_round_idx").on(t.roundId),
+  ]
+);

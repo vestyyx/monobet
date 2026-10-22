@@ -19,6 +19,7 @@ export type CurrentUser = {
   lastSeenAt: Date | null;
   commentsBanned: boolean;
   commentBanUntil: Date | null;
+  frozenAt: Date | null;
   debtCents: number;
   debtRateBps: number;
   debtSince: Date | null;
@@ -47,6 +48,7 @@ export const getCurrentUser = cache(async function getCurrentUser(): Promise<Cur
     bannedAt?: Date | null;
     commentsBanned?: boolean;
     commentBanUntil?: Date | null;
+    frozenAt?: Date | null;
     claimStreak?: number;
     lastActiveDay?: string | null;
     activityStreak?: number;
@@ -87,6 +89,7 @@ export const getCurrentUser = cache(async function getCurrentUser(): Promise<Cur
     lastSeenAt: active.lastSeenAt,
     commentsBanned: u.commentsBanned ?? false,
     commentBanUntil: u.commentBanUntil ?? null,
+    frozenAt: u.frozenAt ?? null,
     debtCents: u.debtCents ?? 0,
     debtRateBps: u.debtRateBps ?? 0,
     debtSince: u.debtSince ?? null,

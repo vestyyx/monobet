@@ -1,0 +1,71 @@
+// Family-game shared constants & math — deliberately pure and unit-testable
+// (fun.test.ts). All rewards are small fixed Mony amounts: party-game prizes,
+// never stakes, never winnings of a wager.
+
+// ---------- shared helpers ----------
+// UTC day string used as the trivia "shownDay" key. Inlined (instead of
+// importing lib/activity) so this module stays DB-free and testable.
+export function funToday(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+// ---------- trivia ----------
+// Base reward by difficulty (in cents; Ɱ100 / Ɱ150 / Ɱ200).
+export const TRIVIA_REWARD_BY_DIFFICULTY: Record<number, number> = {
+  1: 10_000,
+  2: 15_000,
+  3: 20_000,
+};
+
+export const TRIVIA_MAX_STREAK_MULT = 2; // multiplier ceiling
+export const TRIVIA_STREAK_STEP = 0.1; // +10% per consecutive correct answer
+
+// Multiplier for a player whose CURRENT consecutive-correct streak is `streak`
+// (0 for a player whose last answer was wrong). Streak of 0 → ×1.0, grows by
+// +10% per streak day until it caps at ×2.0. Kept pure for tests.
+export function funStreakMultiplier(streak: number): number {
+  const s = Math.max(0, Math.min(10, Math.floor(streak)));
+  return Math.min(1 + s * TRIVIA_STREAK_STEP, TRIVIA_MAX_STREAK_MULT);
+}
+
+// Final reward for a correct answer: base × streak multiplier earned *after*
+// this correct answer (streak counts the answer being paid out).
+export function triviaRewardCents(priorStreak: number, difficulty: number, overrideCents?: number | null): number {
+  const base = overrideCents && overrideCents > 0 ? overrideCents : TRIVIA_REWARD_BY_DIFFICULTY[difficulty] ?? TRIVIA_REWARD_BY_DIFFICULTY[1];
+  return Math.round(base * funStreakMultiplier(priorStreak + 1));
+}
+
+// ---------- closest guess ----------
+// Default winner reward Ɱ200 + Ɱ50 consolation for everyone inside the window.
+export const GUESS_REWARD_CENTS = 20_000;
+export const GUESS_CONSOLATION_CENTS = 5_000;
+// A guess within ±10% of the truth earns the consolation prize.
+export const GUESS_CONSOLATION_WINDOW_PCT = 10;
+
+export function guessWithinWindow(value: number, answer: number): boolean {
+  if (answer === 0) return value === 0;
+  return Math.abs(value - answer) <= Math.abs((answer * GUESS_CONSOLATION_WINDOW_PCT) / 100);
+}
+
+// Distance metric used to crown the closest entry — absolute difference both
+// ways works for counts and sizes alike.
+export function guessDistance(value: number, answer: number): number {
+  return Math.abs(value - answer);
+}
+
+// ---------- closeness helpers ----------
+
+// Whether a closest-guess round still accepts entries — called from BOTH
+// player and admin pages. Lives here so the impure clock read stays out of
+// component scope (render purity rule).
+export function guessRoundOpen(status: string, closeAt: string | number | Date): boolean {
+  if (status !== "open") return false;
+  return new Date(closeAt).getTime() > Date.now();
+}
+
+// Sanity clamp for guess entry values — friendly but bounded (no 10^15).
+export function guessClampValue(value: number): number {
+  const v = Math.round(value);
+  if (!Number.isFinite(v)) return 0;
+  return Math.max(-1_000_000_000, Math.min(1_000_000_000, v));
+}

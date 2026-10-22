@@ -360,6 +360,11 @@ function KindBadge({ kind, lang }: { kind: string; lang?: Lang }) {
     burn: { label: t.kindBurn, tone: "mute" },
     debt: { label: t.kindDebt, tone: "no" },
     transfer: { label: t.kindTransfer, tone: "ink" },
+    trivia: { label: t.kindTrivia, tone: "yes" },
+    guess: { label: t.kindGuess, tone: "yes" },
+    poll: { label: t.kindPoll, tone: "yes" },
+    emoji: { label: t.kindEmoji, tone: "yes" },
+    quest: { label: t.kindQuest, tone: "yes" },
   };
   const { label, tone } = map[kind] ?? { label: kind, tone: "mute" as const };
   return <Badge tone={tone}>{label}</Badge>;

@@ -63,6 +63,9 @@ export async function SiteHeader() {
           <Link href="/jobs" className="px-2.5 py-1.5 rounded-md hover:text-ink hover:bg-surface-2">
             {t.jobs}
           </Link>
+          <Link href="/games" className="px-2.5 py-1.5 rounded-md hover:text-ink hover:bg-surface-2">
+            {t.gamesNav}
+          </Link>
         </nav>
 
         <div className="ml-auto sm:flex-1 sm:max-w-sm">

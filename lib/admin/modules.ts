@@ -59,8 +59,7 @@ export const ADMIN_MODULES: AdminModuleDef[] = [
     built: false,
     deliveryPhase: "Phase 3",
     group: "platform",
-  },
-  {
+  },  {
     id: "settings",
     labelEn: "Platform settings",
     labelCs: "Nastavení platformy",
@@ -184,20 +183,20 @@ export const ADMIN_MODULES: AdminModuleDef[] = [
     descCs: "Banka otázek, obtížnost, rozvrh a statistiky odpovědí.",
     icon: Brain,
     minRole: "admin",
-    built: false,
-    deliveryPhase: "Phase 4+ (family games)",
+    built: true, // live since the family-games batch — /admin/trivia
+    deliveryPhase: "Family games · live",
     group: "games",
   },
   {
-    id: "closest-guess",
+    id: "guess",
     labelEn: "Closest guess",
     labelCs: "Nejbližší tip",
     descEn: "Guess-the-number-style rounds: create, resolve, payouts.",
     descCs: "Kol typu odhadni číslo: tvorba, vyhodnocení, výplaty.",
     icon: Target,
     minRole: "admin",
-    built: false,
-    deliveryPhase: "Phase 4+ (family games)",
+    built: true, // live since the family-games batch — /admin/closest-guess
+    deliveryPhase: "Family games · live",
     group: "games",
   },
   {
