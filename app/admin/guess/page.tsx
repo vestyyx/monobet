@@ -19,23 +19,32 @@ export default async function AdminGuessPage() {
   const lang = await getLang();
   const t = getT(lang);
 
-  // Rounds newest-first with an entrant count (single grouped query).
-  const rows = await db
-    .select({
-      id: schema.guessRound.id,
-      promptCs: schema.guessRound.promptCs,
-      promptEn: schema.guessRound.promptEn,
-      unitCs: schema.guessRound.unitCs,
-      closeAt: schema.guessRound.closeAt,
-      status: schema.guessRound.status,
-      answerValue: schema.guessRound.answerValue,
-      rewardCents: schema.guessRound.rewardCents,
-      consolationCents: schema.guessRound.consolationCents,
-      entrants: sql<number>`(select count(*)::int from ${schema.guessEntry} ge where ge.round_id = ${schema.guessRound.id})`,
-    })
-    .from(schema.guessRound)
-    .orderBy(desc(schema.guessRound.createdAt))
-    .limit(40);
+  // Rounds newest-first + entrant counts from a grouped side query (correlated
+  // subqueries render drizzle columns unqualified — `"id"` — which resolves to
+  // the inner table and returns 0, so an aggregate side-query is the safe path).
+  const [rows, counts] = await Promise.all([
+    db
+      .select({
+        id: schema.guessRound.id,
+        promptCs: schema.guessRound.promptCs,
+        promptEn: schema.guessRound.promptEn,
+        unitCs: schema.guessRound.unitCs,
+        closeAt: schema.guessRound.closeAt,
+        status: schema.guessRound.status,
+        answerValue: schema.guessRound.answerValue,
+        rewardCents: schema.guessRound.rewardCents,
+        consolationCents: schema.guessRound.consolationCents,
+      })
+      .from(schema.guessRound)
+      .orderBy(desc(schema.guessRound.createdAt))
+      .limit(40),
+    db
+      .select({ roundId: schema.guessEntry.roundId, n: sql<number>`count(*)::int` })
+      .from(schema.guessEntry)
+      .groupBy(schema.guessEntry.roundId),
+  ]);
+
+  const entrantsByRound = new Map(counts.map((c) => [c.roundId, Number(c.n)]));
 
   const rounds: GuessAdminRow[] = rows.map((r) => ({
     id: r.id,
@@ -46,7 +55,7 @@ export default async function AdminGuessPage() {
     status: (r.status as "open" | "settled") ?? "open",
     canSettle:
       r.status === "open" && r.closeAt != null && !guessRoundOpen(r.status, r.closeAt),
-    entrants: Number(r.entrants ?? 0),
+    entrants: entrantsByRound.get(r.id) ?? 0,
     answerValue: r.answerValue != null ? Number(r.answerValue) : null,
     rewardCents: r.rewardCents,
     consolationCents: r.consolationCents,

@@ -19,6 +19,7 @@ import {
   guessWithinWindow,
   GUESS_REWARD_CENTS,
   GUESS_CONSOLATION_CENTS,
+  TRIVIA_REWARD_BY_DIFFICULTY,
 } from "@/lib/fun";
 
 // ---------- audit (shared by every admin action across the panel) ----------
@@ -144,7 +145,10 @@ async function withTriviaState(q: typeof schema.triviaQuestion.$inferSelect, me:
     answeredCorrect: me?.correct ?? null,
     rewardCents: me?.rewardCents ?? null,
     answeredCorrectIdx: me ? q.correctIdx : null,
-    pot: q.rewardCents && q.rewardCents > 0 ? q.rewardCents : null,
+    pot:
+      q.rewardCents && q.rewardCents > 0
+        ? q.rewardCents
+        : TRIVIA_REWARD_BY_DIFFICULTY[q.difficulty] ?? TRIVIA_REWARD_BY_DIFFICULTY[1],
     streak,
     answeredCount: stats?.n ?? 0,
     correctCount: stats?.ok ?? 0,
