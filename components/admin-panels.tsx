@@ -1,18 +1,15 @@
-"use client";
+﻿"use client";
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Button, Input, Select, Badge } from "@/components/ui/primitives";
-import { approveMarket, rejectMarket, resolveMarket, cancelMarket, grantBalance, createCategory, renameCategory, deleteCategory, reorderCategories, deleteMarket, adminCreateUser, adminSetUserBanned, adminSetCommentsBanned, adminSetUserRole, adminRenameUser, adminResetUserPassword, adminSettleDuel, adminDeleteUser, adminUpsertDealer, adminDeleteDealer, adminToggleDealer, setCasinoRig, setUserLuck, setGameEnabled, setLeverageConfig, setGameRules, resetJackpot, adminResetEconomy } from "@/lib/actions";
-import { GAME_KEYS } from "@/lib/games";
+import { approveMarket, rejectMarket, resolveMarket, cancelMarket, grantBalance, createCategory, renameCategory, deleteCategory, reorderCategories, deleteMarket, adminCreateUser, adminSetUserBanned, adminSetCommentsBanned, adminSetUserRole, adminRenameUser, adminResetUserPassword, adminSettleDuel, adminDeleteUser, setLeverageConfig, setHouseRules, adminResetEconomy } from "@/lib/actions";
 import { fmtMonos, fmtDate } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { getT, type Lang } from "@/lib/i18n";
 import { Check, X, CircleCheck, Ban, Pencil, Trash2, KeyRound, MessageSquareOff, MessageSquare, ShieldPlus, ShieldMinus, GripVertical, StickyNote, Scale } from "lucide-react";
-import { ImageCell, IconPicker } from "@/components/image-cell";
-import { DealerAvatar } from "@/components/dealer-avatar";
 
 function useAction(lang?: Lang) {
   const t = getT(lang ?? "cs");
@@ -226,39 +223,20 @@ export function GrantPanel({ users, lang }: { users: { id: string; username: str
   );
 }
 
-// House P&L + casino tuning — admin "inside info": what the bank wins, and
-// knobs for global riggedness and per-user luck on the random games.
+// House P&L + economy tuning — admin "inside info": fees banked by the house
+// and the knobs for trade fees, loan APR, referral royalties and min trades.
 type HouseStats = {
-  games: { game: string; rounds: number; wageredCents: number; paidCents: number; profitCents: number }[];
-  wageredCents: number;
-  paidCents: number;
-  profitCents: number;
-  profit24hCents: number;
-  profit7dCents: number;
   feesCents: { total: number; game: number; trade: number; levGame: number; levTrade: number };
-  rigBps: number;
-  disabledGames: string[];
   lev: {
-    gameMaxLev: number;
     tradeMaxLev: number;
     levFeeBps: number;
-    gameLevCaps: Record<string, number>;
-    gameMaxBetCents: number;
     tradeMaxSpendCents: number;
-    gameBetCaps: Record<string, number>;
   };
   rules: {
-    autobetEnabled: boolean;
-    gameDailyLimitMs: number;
-    gameIdleMs: number;
-    gameFeeCents: number;
     tradeFeeCents: number;
     debtRateBps: number;
     referralRoyaltyBps: number;
     referralRoyaltyCapCents: number;
-    dicePayBps: number;
-    limboPayBps: number;
-    limboMinX100: number;
     minTradeCents: number;
   };
   loans: { count: number; disbursedCents: number; repaidCents: number; outstandingCents: number; positionCents: number };
@@ -266,126 +244,54 @@ type HouseStats = {
 
 export function HousePanel({
   stats,
-  users,
   lang,
 }: {
   stats: HouseStats;
-  users: { id: string; username: string | null; luckBps: number }[];
   lang?: Lang;
 }) {
   const t = getT(lang ?? "cs");
   const { pending, run } = useAction(lang);
-  const [rigPct, setRigPct] = useState((stats.rigBps / 100).toFixed(0));
-  const [luckUser, setLuckUser] = useState(users[0]?.id ?? "");
-  const [luckPct, setLuckPct] = useState("");
-  // Leverage knobs — per-game fields stay blank unless an override exists;
-  // blank means "follow the global game cap".
-  const [levGame, setLevGame] = useState(String(stats.lev.gameMaxLev));
+  // Leverage + spend knobs for market orders — trade-only now that the
+  // casino minigames (and their per-game overrides) are gone.
   const [levTrade, setLevTrade] = useState(String(stats.lev.tradeMaxLev));
   const [levFee, setLevFee] = useState((stats.lev.levFeeBps / 100).toFixed(0));
-  const [levPer, setLevPer] = useState<Record<string, string>>(
-    Object.fromEntries(Object.entries(stats.lev.gameLevCaps).map(([k, v]) => [k, String(v)]))
-  );
-  // Stake ceilings — Ɱ units in the inputs; per-game blank follows global.
-  const [betGame, setBetGame] = useState(String(stats.lev.gameMaxBetCents / 100));
+  // Stake ceiling — Ɱ units in the input.
   const [betTrade, setBetTrade] = useState(String(stats.lev.tradeMaxSpendCents / 100));
-  const [betPer, setBetPer] = useState<Record<string, string>>(
-    Object.fromEntries(Object.entries(stats.lev.gameBetCaps).map(([k, v]) => [k, String(v / 100)]))
-  );
   // House rules — the former hardcodes, now admin-tunable.
-  const [ruleAutobet, setRuleAutobet] = useState(stats.rules.autobetEnabled);
-  const [ruleDaily, setRuleDaily] = useState((stats.rules.gameDailyLimitMs / 3_600_000).toString());
-  const [ruleIdle, setRuleIdle] = useState((stats.rules.gameIdleMs / 60_000).toString());
-  const [ruleGameFee, setRuleGameFee] = useState((stats.rules.gameFeeCents / 100).toString());
   const [ruleTradeFee, setRuleTradeFee] = useState((stats.rules.tradeFeeCents / 100).toString());
   const [ruleApr, setRuleApr] = useState((stats.rules.debtRateBps / 100).toString());
   const [ruleRoyPct, setRuleRoyPct] = useState((stats.rules.referralRoyaltyBps / 100).toString());
   const [ruleRoyCap, setRuleRoyCap] = useState((stats.rules.referralRoyaltyCapCents / 100).toString());
-  const [ruleDicePay, setRuleDicePay] = useState((stats.rules.dicePayBps / 100).toString());
-  const [ruleLimboPay, setRuleLimboPay] = useState((stats.rules.limboPayBps / 100).toString());
-  const [ruleLimboMin, setRuleLimboMin] = useState((stats.rules.limboMinX100 / 100).toString());
   const [ruleMinTrade, setRuleMinTrade] = useState((stats.rules.minTradeCents / 100).toString());
-  const houseGameName = (key: string) =>
-    (({ Coin: t.gCoinFlip, Dice: t.gDice, Timer: t.gTimer, Limbo: t.gLimbo, Wheel: t.gWheel, Slots: t.gSlots, Plinko: t.gPlinko, Blackjack: t.gBlackjack, "Hi-Lo": t.gHilo, "Red/Black": t.gRedBlack, coinflip: t.gCoinFlip, dice: t.gDice, timer: t.gTimer, limbo: t.gLimbo, wheel: t.gWheel, slots: t.gSlots, plinko: t.gPlinko, blackjack: t.gBlackjack, hilo: t.gHilo, redblack: t.gRedBlack } as Record<string, string>)[key] ?? key);
-  const luckyUsers = users.filter((u) => u.luckBps !== 0);
-  const hold = stats.wageredCents > 0 ? (stats.profitCents / stats.wageredCents) * 100 : 0;
 
   return (
     <div className="p-4 space-y-5">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        {[
-          { label: t.house24h, v: stats.profit24hCents },
-          { label: t.house7d, v: stats.profit7dCents },
-          { label: t.houseAll, v: stats.profitCents },
-        ].map((s) => (
-          <div key={s.label} className="rounded-xl border border-line bg-surface-2 px-3 py-2.5">
-            <div className="text-[11px] font-semibold text-faint">{s.label}</div>
-            <div className={cn("num text-[17px] font-bold", s.v >= 0 ? "text-yes-strong" : "text-no-strong")}>
-              {s.v >= 0 ? "+" : "−"}{fmtMonos(Math.abs(s.v), { lang })}
-            </div>
-          </div>
-        ))}
-        <div className="rounded-xl border border-line bg-surface-2 px-3 py-2.5">
-          <div className="text-[11px] font-semibold text-faint">{t.houseHold}</div>
-          <div className="num text-[17px] font-bold text-ink">{hold.toFixed(1)}%</div>
-        </div>
-        <div className="rounded-xl border border-line bg-surface-2 px-3 py-2.5">
-          <div className="text-[11px] font-semibold text-faint">{t.houseFees}</div>
-          <div className="num text-[17px] font-bold text-yes-strong">+{fmtMonos(stats.feesCents.total, { lang })}</div>
-          <div className="num text-[10.5px] text-faint">{t.houseFeesNote(fmtMonos(stats.feesCents.game, { lang }), fmtMonos(stats.feesCents.trade, { lang }))}</div>
-          <div className="num text-[10.5px] text-faint">{t.houseFeesLevNote(fmtMonos(stats.feesCents.levGame, { lang }), fmtMonos(stats.feesCents.levTrade, { lang }))}</div>
-        </div>
+      <div className="rounded-xl border border-line bg-surface-2 px-3 py-2.5">
+        <div className="text-[11px] font-semibold text-faint">{t.houseFees}</div>
+        <div className="num text-[17px] font-bold text-yes-strong">+{fmtMonos(stats.feesCents.total, { lang })}</div>
+        <div className="num text-[10.5px] text-faint">{t.houseFeesNote(fmtMonos(stats.feesCents.game, { lang }), fmtMonos(stats.feesCents.trade, { lang }))}</div>
+        <div className="num text-[10.5px] text-faint">{t.houseFeesLevNote(fmtMonos(stats.feesCents.levGame, { lang }), fmtMonos(stats.feesCents.levTrade, { lang }))}</div>
       </div>
 
-      {(stats.games.length > 0 || stats.loans.count > 0) && (
+      {stats.loans.count > 0 && (
         <div className="overflow-x-auto">
           <table className="w-full text-[12.5px]">
-            <thead>
-              <tr className="text-left text-[11px] font-semibold text-faint border-b border-line">
-                <th className="pb-1.5 pr-3">{t.houseGame}</th>
-                <th className="pb-1.5 pr-3 text-right">{t.houseRounds}</th>
-                <th className="pb-1.5 pr-3 text-right">{t.houseWagered}</th>
-                <th className="pb-1.5 pr-3 text-right">{t.housePaid}</th>
-                <th className="pb-1.5 pr-3 text-right">{t.houseProfit}</th>
-                <th className="pb-1.5 text-right">{t.houseHold}</th>
-              </tr>
-            </thead>
             <tbody>
-              {[...stats.games]
-                .sort((a, b) => b.profitCents - a.profitCents)
-                .map((g) => (
-                  <tr key={g.game} className="border-b border-line/60 last:border-0">
-                    <td className="py-1.5 pr-3 font-semibold text-ink">{houseGameName(g.game)}</td>
-                    <td className="py-1.5 pr-3 text-right num text-mute">{g.rounds.toLocaleString()}</td>
-                    <td className="py-1.5 pr-3 text-right num text-mute">{fmtMonos(g.wageredCents, { lang })}</td>
-                    <td className="py-1.5 pr-3 text-right num text-mute">{fmtMonos(g.paidCents, { lang })}</td>
-                    <td className={cn("py-1.5 pr-3 text-right num font-bold", g.profitCents >= 0 ? "text-yes-strong" : "text-no-strong")}>
-                      {g.profitCents >= 0 ? "+" : "−"}{fmtMonos(Math.abs(g.profitCents), { lang })}
-                    </td>
-                    <td className="py-1.5 text-right num text-mute">
-                      {g.wageredCents > 0 ? `${((g.profitCents / g.wageredCents) * 100).toFixed(1)}%` : "—"}
-                    </td>
-                  </tr>
-                ))}
-              {stats.loans.count > 0 && (
-                <tr className="border-b border-line/60 last:border-0">
-                  <td className="py-1.5 pr-3 font-semibold text-ink">{t.houseLoans}</td>
-                  <td className="py-1.5 pr-3 text-right num text-mute">{stats.loans.count}</td>
-                  <td className="py-1.5 pr-3 text-right num text-mute">{fmtMonos(stats.loans.disbursedCents, { lang })}</td>
-                  <td className="py-1.5 pr-3 text-right num text-mute">{fmtMonos(stats.loans.repaidCents, { lang })}</td>
-                  <td className={cn("py-1.5 pr-3 text-right num font-bold", stats.loans.positionCents >= 0 ? "text-yes-strong" : "text-no-strong")}>
-                    {stats.loans.positionCents >= 0 ? "+" : "−"}{fmtMonos(Math.abs(stats.loans.positionCents), { lang })}
-                  </td>
-                  <td className="py-1.5 text-right num text-mute">
-                    {stats.loans.disbursedCents > 0 ? `${((stats.loans.positionCents / stats.loans.disbursedCents) * 100).toFixed(1)}%` : "—"}
-                  </td>
-                </tr>
-              )}
+              <tr className="border-b border-line/60 last:border-0">
+                <td className="py-1.5 pr-3 font-semibold text-ink">{t.houseLoans}</td>
+                <td className="py-1.5 pr-3 text-right num text-mute">{stats.loans.count}</td>
+                <td className="py-1.5 pr-3 text-right num text-mute">{fmtMonos(stats.loans.disbursedCents, { lang })}</td>
+                <td className="py-1.5 pr-3 text-right num text-mute">{fmtMonos(stats.loans.repaidCents, { lang })}</td>
+                <td className={cn("py-1.5 pr-3 text-right num font-bold", stats.loans.positionCents >= 0 ? "text-yes-strong" : "text-no-strong")}>
+                  {stats.loans.positionCents >= 0 ? "+" : "−"}{fmtMonos(Math.abs(stats.loans.positionCents), { lang })}
+                </td>
+                <td className="py-1.5 text-right num text-mute">
+                  {stats.loans.disbursedCents > 0 ? `${((stats.loans.positionCents / stats.loans.disbursedCents) * 100).toFixed(1)}%` : "—"}
+                </td>
+              </tr>
             </tbody>
           </table>
-          {stats.loans.count > 0 && (
-            <p className="mt-1.5 text-[11px] text-faint">{t.houseLoansNote(fmtMonos(stats.loans.outstandingCents, { lang }))}</p>
-          )}
+          <p className="mt-1.5 text-[11px] text-faint">{t.houseLoansNote(fmtMonos(stats.loans.outstandingCents, { lang }))}</p>
         </div>
       )}
 
@@ -395,94 +301,12 @@ export function HousePanel({
           className="rounded-xl border border-line bg-surface-2 p-3 space-y-2"
           onSubmit={(e) => {
             e.preventDefault();
-            run(() => setCasinoRig({ rigBps: Math.round(parseFloat(rigPct || "0") * 100) }), t.savedToast);
-          }}
-        >
-          <div className="text-[12px] font-bold text-ink">{t.houseRigTitle}</div>
-          <div className="flex gap-2">
-            <Input type="number" min={0} max={100} step="1" value={rigPct} onChange={(e) => setRigPct(e.target.value)} />
-            <Button size="sm" disabled={pending}>{t.save}</Button>
-          </div>
-          <p className="text-[11px] text-faint">{t.houseRigNote}</p>
-        </form>
-
-        <form
-          noValidate
-          className="rounded-xl border border-line bg-surface-2 p-3 space-y-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            run(() => setUserLuck({ userId: luckUser, luckBps: Math.round(parseFloat(luckPct || "0") * 100) }), t.savedToast);
-          }}
-        >
-          <div className="text-[12px] font-bold text-ink">{t.userLuckTitle}</div>
-          <div className="flex gap-2">
-            <Select value={luckUser} onChange={(e) => setLuckUser(e.target.value)}>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  @{u.username ?? u.id.slice(0, 8)}{u.luckBps !== 0 ? ` (${(u.luckBps / 100).toFixed(0)}%)` : ""}
-                </option>
-              ))}
-            </Select>
-            <Input type="number" min={-50} max={50} step="1" placeholder="%" value={luckPct} onChange={(e) => setLuckPct(e.target.value)} className="w-20 shrink-0" />
-            <Button size="sm" disabled={pending || !luckUser}>{t.save}</Button>
-          </div>
-          <p className="text-[11px] text-faint">{t.userLuckNote}</p>
-          {luckyUsers.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 pt-0.5">
-              {luckyUsers.map((u) => (
-                <Badge key={u.id} tone={u.luckBps > 0 ? "yes" : "no"}>
-                  @{u.username ?? u.id.slice(0, 8)} {(u.luckBps / 100).toFixed(0)}%
-                </Badge>
-              ))}
-            </div>
-          )}
-        </form>
-
-        <div className="rounded-xl border border-line bg-surface-2 p-3 space-y-2">
-          <div className="text-[12px] font-bold text-ink">{t.houseGamesTitle}</div>
-          <div className="flex flex-wrap gap-1.5">
-            {GAME_KEYS.map((g) => {
-              const off = stats.disabledGames.includes(g);
-              return (
-                <button
-                  key={g}
-                  type="button"
-                  disabled={pending}
-                  onClick={() => run(() => setGameEnabled({ game: g, enabled: off }), t.savedToast)}
-                  className={cn(
-                    "rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors",
-                    off
-                      ? "border-no/50 bg-no/10 text-no-strong line-through"
-                      : "border-yes/50 bg-yes/10 text-yes-strong"
-                  )}
-                >
-                  {houseGameName(g)}
-                </button>
-              );
-            })}
-          </div>
-          <p className="text-[11px] text-faint">{t.houseGamesNote}</p>
-        </div>
-
-        <form
-          noValidate
-          className="rounded-xl border border-line bg-surface-2 p-3 space-y-2 sm:col-span-2"
-          onSubmit={(e) => {
-            e.preventDefault();
             run(
               () =>
                 setLeverageConfig({
-                  gameMaxLev: Math.round(parseFloat(levGame || "1")),
                   tradeMaxLev: Math.round(parseFloat(levTrade || "1")),
                   levFeeBps: Math.round(parseFloat(levFee || "0") * 100),
-                  gameLevCaps: Object.fromEntries(
-                    GAME_KEYS.map((g) => [g, levPer[g] === "" || levPer[g] == null ? null : Math.round(parseFloat(levPer[g]))])
-                  ),
-                  gameMaxBetCents: Math.round(parseFloat(betGame || "1000") * 100),
                   tradeMaxSpendCents: Math.round(parseFloat(betTrade || "5000") * 100),
-                  gameBetCaps: Object.fromEntries(
-                    GAME_KEYS.map((g) => [g, betPer[g] === "" || betPer[g] == null ? null : Math.round(parseFloat(betPer[g]) * 100)])
-                  ),
                 }),
               t.savedToast
             );
@@ -491,10 +315,6 @@ export function HousePanel({
           <div className="text-[12px] font-bold text-ink">{t.levCfgTitle}</div>
           <div className="grid grid-cols-3 gap-2">
             <label className="space-y-1">
-              <span className="text-[11px] font-medium text-mute">{t.levCfgGames}</span>
-              <Input type="number" min={1} max={100} step="1" value={levGame} onChange={(e) => setLevGame(e.target.value)} />
-            </label>
-            <label className="space-y-1">
               <span className="text-[11px] font-medium text-mute">{t.levCfgMarkets}</span>
               <Input type="number" min={1} max={100} step="1" value={levTrade} onChange={(e) => setLevTrade(e.target.value)} />
             </label>
@@ -502,49 +322,10 @@ export function HousePanel({
               <span className="text-[11px] font-medium text-mute">{t.levCfgFee}</span>
               <Input type="number" min={0} max={50} step="0.5" value={levFee} onChange={(e) => setLevFee(e.target.value)} />
             </label>
-          </div>
-          <div className="grid grid-cols-5 gap-1.5">
-            {GAME_KEYS.map((g) => (
-              <label key={g} className="space-y-0.5">
-                <span className="block truncate text-[10.5px] font-medium text-mute">{houseGameName(g)}</span>
-                <Input
-                  type="number"
-                  min={1}
-                  max={100}
-                  step="1"
-                  placeholder={levGame}
-                  title={t.levCfgPerGameTitle}
-                  value={levPer[g] ?? ""}
-                  onChange={(e) => setLevPer((p) => ({ ...p, [g]: e.target.value }))}
-                />
-              </label>
-            ))}
-          </div>
-          <div className="grid grid-cols-2 gap-2 pt-1">
-            <label className="space-y-1">
-              <span className="text-[11px] font-medium text-mute">{t.betCfgGames}</span>
-              <Input type="number" min={1} step="any" value={betGame} onChange={(e) => setBetGame(e.target.value)} />
-            </label>
             <label className="space-y-1">
               <span className="text-[11px] font-medium text-mute">{t.betCfgMarkets}</span>
               <Input type="number" min={10} step="any" value={betTrade} onChange={(e) => setBetTrade(e.target.value)} />
             </label>
-          </div>
-          <div className="grid grid-cols-5 gap-1.5">
-            {GAME_KEYS.map((g) => (
-              <label key={g} className="space-y-0.5">
-                <span className="block truncate text-[10.5px] font-medium text-mute">{houseGameName(g)} Ɱ</span>
-                <Input
-                  type="number"
-                  min={1}
-                  step="any"
-                  placeholder={betGame}
-                  title={t.betCfgPerGameTitle}
-                  value={betPer[g] ?? ""}
-                  onChange={(e) => setBetPer((p) => ({ ...p, [g]: e.target.value }))}
-                />
-              </label>
-            ))}
           </div>
           <div className="flex items-center justify-between gap-2">
             <p className="text-[11px] text-faint">{t.levCfgNote}</p>
@@ -554,57 +335,24 @@ export function HousePanel({
 
         <form
           noValidate
-          className="rounded-xl border border-line bg-surface-2 p-3 space-y-2 sm:col-span-2"
+          className="rounded-xl border border-line bg-surface-2 p-3 space-y-2"
           onSubmit={(e) => {
             e.preventDefault();
             run(
               () =>
-                setGameRules({
-                  autobetEnabled: ruleAutobet,
-                  gameDailyLimitMs: Math.round(parseFloat(ruleDaily || "2") * 3_600_000),
-                  gameIdleMs: Math.round(parseFloat(ruleIdle || "30") * 60_000),
-                  gameFeeCents: Math.round(parseFloat(ruleGameFee || "0") * 100),
+                setHouseRules({
                   tradeFeeCents: Math.round(parseFloat(ruleTradeFee || "0") * 100),
                   debtRateBps: Math.round(parseFloat(ruleApr || "0") * 100),
                   referralRoyaltyBps: Math.round(parseFloat(ruleRoyPct || "0") * 100),
                   referralRoyaltyCapCents: Math.round(parseFloat(ruleRoyCap || "0") * 100),
-                  dicePayBps: Math.round(parseFloat(ruleDicePay || "92") * 100),
-                  limboPayBps: Math.round(parseFloat(ruleLimboPay || "96") * 100),
-                  limboMinX100: Math.round(parseFloat(ruleLimboMin || "1.1") * 100),
                   minTradeCents: Math.round(parseFloat(ruleMinTrade || "0") * 100),
                 }),
               t.savedToast
             );
           }}
         >
-          <div className="flex items-center justify-between gap-2">
-            <div className="text-[12px] font-bold text-ink">{t.rulesTitle}</div>
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <span className="text-[11px] font-medium text-mute" title={t.rulesAutobetDesc}>{t.rulesAutobet}</span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={ruleAutobet}
-                onClick={() => setRuleAutobet((v) => !v)}
-                className={cn("relative h-5 w-9 rounded-full transition-colors cursor-pointer", ruleAutobet ? "bg-brand" : "bg-surface-3")}
-              >
-                <span className={cn("absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform", ruleAutobet ? "translate-x-[18px]" : "translate-x-0.5")} />
-              </button>
-            </label>
-          </div>
+          <div className="text-[12px] font-bold text-ink">{t.rulesTitle}</div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <label className="space-y-1">
-              <span className="text-[11px] font-medium text-mute">{t.rulesDaily}</span>
-              <Input type="number" min={0.5} max={24} step={0.5} value={ruleDaily} onChange={(e) => setRuleDaily(e.target.value)} />
-            </label>
-            <label className="space-y-1">
-              <span className="text-[11px] font-medium text-mute">{t.rulesIdle}</span>
-              <Input type="number" min={1} max={1440} step="1" value={ruleIdle} onChange={(e) => setRuleIdle(e.target.value)} />
-            </label>
-            <label className="space-y-1">
-              <span className="text-[11px] font-medium text-mute">{t.rulesGameFee}</span>
-              <Input type="number" min={0} max={1000} step="0.5" value={ruleGameFee} onChange={(e) => setRuleGameFee(e.target.value)} />
-            </label>
             <label className="space-y-1">
               <span className="text-[11px] font-medium text-mute">{t.rulesTradeFee}</span>
               <Input type="number" min={0} max={1000} step="0.5" value={ruleTradeFee} onChange={(e) => setRuleTradeFee(e.target.value)} />
@@ -625,18 +373,6 @@ export function HousePanel({
               <span className="text-[11px] font-medium text-mute">{t.rulesMinTrade}</span>
               <Input type="number" min={0} step="1" value={ruleMinTrade} onChange={(e) => setRuleMinTrade(e.target.value)} />
             </label>
-            <label className="space-y-1">
-              <span className="text-[11px] font-medium text-mute">{t.rulesDicePay}</span>
-              <Input type="number" min={10} max={100} step="0.5" value={ruleDicePay} onChange={(e) => setRuleDicePay(e.target.value)} />
-            </label>
-            <label className="space-y-1">
-              <span className="text-[11px] font-medium text-mute">{t.rulesLimboPay}</span>
-              <Input type="number" min={10} max={100} step="0.5" value={ruleLimboPay} onChange={(e) => setRuleLimboPay(e.target.value)} />
-            </label>
-            <label className="space-y-1">
-              <span className="text-[11px] font-medium text-mute">{t.rulesLimboMin}</span>
-              <Input type="number" min={1.01} max={100} step="0.01" value={ruleLimboMin} onChange={(e) => setRuleLimboMin(e.target.value)} />
-            </label>
           </div>
           <div className="flex items-center justify-between gap-2">
             <p className="text-[11px] text-faint">{t.rulesNote}</p>
@@ -647,14 +383,6 @@ export function HousePanel({
         <div className="rounded-xl border border-line bg-surface-2 p-3 space-y-2">
           <div className="text-[12px] font-bold text-ink">{t.houseDangerTitle}</div>
           <div className="flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={pending}
-              onClick={() => run(() => resetJackpot(), t.savedToast)}
-            >
-              {t.houseJackpotReset}
-            </Button>
             <Button
               size="sm"
               variant="no"
@@ -1067,189 +795,4 @@ export function DuelAdminPanel({
   );
 }
 
-// Blackjack dealer personas — name + emoji + outcome quips; a random active
-// one fronts each hand. Edited inline; inactive dealers stop dealing.
-export function DealersPanel({
-  dealers,
-  lang,
-}: {
-  dealers: { id: string; name: string; avatar: string; quipWin: string; quipLose: string; active: boolean }[];
-  lang?: Lang;
-}) {
-  const t = getT(lang ?? "cs");
-  const router = useRouter();
-  const [pending, start] = useTransition();
-  const [name, setName] = useState("");
-  const [avatar, setAvatar] = useState("");
-  const [quipWin, setQuipWin] = useState("");
-  const [quipLose, setQuipLose] = useState("");
-  const [editing, setEditing] = useState<string | null>(null);
 
-  const run = (fn: () => Promise<{ ok: boolean; error?: string }>, ok: string, after?: () => void) =>
-    start(async () => {
-      const r = await fn();
-      if (r.ok) {
-        toast.success(ok);
-        after?.();
-        router.refresh();
-      } else toast.error(t.serverErr(r.error));
-    });
-
-  return (
-    <div className="p-4 space-y-3">
-      <p className="text-[11.5px] text-faint">{t.dealersHint}</p>
-      <div className="divide-y divide-line-2">
-        {dealers.map((d) => (
-          <div key={d.id} className="py-2.5 first:pt-0">
-            {editing === d.id ? (
-              <DealerForm
-                initial={d}
-                pending={pending}
-                lang={lang}
-                onSave={(v) => run(() => adminUpsertDealer({ id: d.id, ...v }), t.savedToast, () => setEditing(null))}
-                onCancel={() => setEditing(null)}
-              />
-            ) : (
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <DealerAvatar avatar={d.avatar} className="size-8 rounded-lg text-[13px]" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-[13px] font-semibold flex items-center gap-1.5">
-                    {d.name}
-                    {!d.active && <Badge tone="mute">{t.dealerInactive}</Badge>}
-                  </div>
-                  <div className="text-[11px] text-faint truncate">
-                    {d.quipWin && `W: “${d.quipWin}”`} {d.quipLose && `· L: “${d.quipLose}”`}
-                  </div>
-                </div>
-                <div className="flex gap-1 shrink-0">
-                  <button
-                    type="button"
-                    title={t.rename}
-                    onClick={() => setEditing(d.id)}
-                    className="size-7 grid place-items-center rounded-md text-faint hover:text-ink hover:bg-surface-2 cursor-pointer"
-                  >
-                    <Pencil className="size-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    title={d.active ? t.dealerInactive : t.approve}
-                    disabled={pending}
-                    onClick={() => run(() => adminToggleDealer({ id: d.id, active: !d.active }), t.savedToast)}
-                    className="size-7 grid place-items-center rounded-md text-faint hover:text-ink hover:bg-surface-2 cursor-pointer disabled:opacity-40"
-                  >
-                    {d.active ? <Ban className="size-3.5" /> : <Check className="size-3.5" />}
-                  </button>
-                  <button
-                    type="button"
-                    title={t.delete}
-                    disabled={pending}
-                    onClick={() => {
-                      if (confirm(t.deleteCatConfirm(d.name))) run(() => adminDeleteDealer({ id: d.id }), t.catDeleted);
-                    }}
-                    className="size-7 grid place-items-center rounded-md text-faint hover:text-no-strong hover:bg-no-soft cursor-pointer disabled:opacity-40"
-                  >
-                    <Trash2 className="size-3.5" />
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
-        {dealers.length === 0 && <p className="text-[12.5px] text-faint py-1">{t.notesEmpty}</p>}
-      </div>
-      <DealerForm
-        pending={pending}
-        lang={lang}
-        onSave={(v) =>
-          run(() => adminUpsertDealer(v), t.dealerAdd, () => {
-            setName("");
-            setAvatar("");
-            setQuipWin("");
-            setQuipLose("");
-          })
-        }
-        onCancel={null}
-        values={{ name, avatar, quipWin, quipLose }}
-        onChange={{ setName, setAvatar, setQuipWin, setQuipLose }}
-      />
-    </div>
-  );
-}
-
-function DealerForm({
-  initial,
-  values,
-  onChange,
-  pending,
-  lang,
-  onSave,
-  onCancel,
-}: {
-  initial?: { name: string; avatar: string; quipWin: string; quipLose: string };
-  values?: { name: string; avatar: string; quipWin: string; quipLose: string };
-  onChange?: { setName: (v: string) => void; setAvatar: (v: string) => void; setQuipWin: (v: string) => void; setQuipLose: (v: string) => void };
-  pending: boolean;
-  lang?: Lang;
-  onSave: (v: { name: string; avatar: string; quipWin: string; quipLose: string }) => void;
-  onCancel: (() => void) | null;
-}) {
-  const t = getT(lang ?? "cs");
-  // Inline-edit rows manage their own state; the add form lifts it to the parent.
-  const [n, setN] = useState(initial?.name ?? "");
-  const [a, setA] = useState(initial?.avatar ?? "");
-  const [qw, setQw] = useState(initial?.quipWin ?? "");
-  const [ql, setQl] = useState(initial?.quipLose ?? "");
-  const name = values?.name ?? n;
-  const avatar = values?.avatar ?? a;
-  const quipWin = values?.quipWin ?? qw;
-  const quipLose = values?.quipLose ?? ql;
-  const setters = onChange ?? { setName: setN, setAvatar: setA, setQuipWin: setQw, setQuipLose: setQl };
-  return (
-    <form
-      className="space-y-2"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (!name.trim()) return;
-        onSave({ name, avatar, quipWin, quipLose });
-        if (!onChange) {
-          setN("");
-          setA("");
-          setQw("");
-          setQl("");
-        }
-      }}
-    >
-      <div className="flex items-center gap-2 flex-wrap">
-        <ImageCell
-          image={/^(data:image\/|https?:\/\/|\/)\S+/.test(avatar) ? avatar : ""}
-          onImage={setters.setAvatar}
-          imageHint={t.optionImageHint}
-          onBadImage={() => toast.error(t.imageBad)}
-          className="size-9"
-        />
-        <IconPicker onPick={setters.setAvatar} hint={t.iconPickerHint} />
-        <Input
-          value={/^(data:image\/|https?:\/\/|\/)\S+/.test(avatar) ? "" : avatar}
-          onChange={(e) => setters.setAvatar(e.target.value)}
-          placeholder="DD"
-          title={t.dealerAvatarPh}
-          maxLength={4}
-          className="h-9 w-16 text-center"
-        />
-        <Input value={name} onChange={(e) => setters.setName(e.target.value)} placeholder={t.dealerNamePh} maxLength={40} required className="h-9 flex-1 min-w-0" />
-      </div>
-      <Input value={quipWin} onChange={(e) => setters.setQuipWin(e.target.value)} placeholder={t.dealerQuipWinPh} maxLength={140} className="h-9" />
-      <Input value={quipLose} onChange={(e) => setters.setQuipLose(e.target.value)} placeholder={t.dealerQuipLosePh} maxLength={140} className="h-9" />
-      <div className="flex gap-2">
-        <Button size="sm" disabled={pending || !name.trim()}>
-          {initial ? t.rename : t.dealerAdd}
-        </Button>
-        {onCancel && (
-          <Button size="sm" variant="outline" type="button" onClick={onCancel}>
-            ✕
-          </Button>
-        )}
-      </div>
-    </form>
-  );
-}

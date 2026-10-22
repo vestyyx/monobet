@@ -4,7 +4,7 @@
 import { db, schema } from "@/lib/db";
 import { eq, and, sql } from "drizzle-orm";
 import { yesPrice, tradeCost, multiCoords, multiPrices, multiTradeCost, TRADE_FEE_CENTS } from "@/lib/lmsr";
-import { accruedDebtCents, DEBT_CAP_CENTS, GAME_DEBT_RATE_BPS } from "@/lib/loans";
+import { accruedDebtCents, DEBT_CAP_CENTS, DEFAULT_DEBT_RATE_BPS } from "@/lib/loans";
 import { liquidationValueCents, groupLiquidationValueCents, shouldLiquidate } from "@/lib/liq";
 
 export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -84,15 +84,13 @@ export async function lockUser(tx: Tx, userId: string) {
   return rows[0];
 }
 
-// A win's profit feeds the debt at the player's vow rate — Bez slibu (0%)
-// keeps the whole win, a 30% vow skims a third of the profit. The vow is the
-// debtor's chosen repayment share, not a decoration.
+// When auto-repay is on, a win's profit feeds the debt in full; off, the
+// player keeps everything.
 export async function garnishDebt(tx: Tx, userId: string, profitCents: number, label: string): Promise<number> {
   const u = await lockUser(tx, userId);
   const debt = accruedDebtCents(u.debtCents, u.debtRateBps, u.debtSince);
-  // Auto-repay overrides the vow slider — every win feeds the loan in full.
-  const vowBps = u.autoRepay ? 10_000 : u.vowBps;
-  const skim = Math.min(Math.max(0, Math.round((profitCents * vowBps) / 10_000)), debt);
+  if (!u.autoRepay) return 0;
+  const skim = Math.min(Math.max(0, profitCents), debt);
   if (skim <= 0) return 0;
   const left = debt - skim;
   await tx
@@ -183,7 +181,7 @@ export async function releaseDebt(tx: Tx, userId: string, cents: number, memo: s
 // service the debt first, the remainder (if any) credits the user. Iterates
 // to a fixpoint — a liquidation late in the scan can push an earlier-passed
 // position under the cushion, so loop until a pass frees nothing.
-export async function checkLiquidations(tx: Tx, marketId: string, debtRateBps = GAME_DEBT_RATE_BPS) {
+export async function checkLiquidations(tx: Tx, marketId: string, debtRateBps = DEFAULT_DEBT_RATE_BPS) {
   const m = await lockMarket(tx, marketId);
   let qy = toNum(m.qYes);
   let qn = toNum(m.qNo);
@@ -254,7 +252,7 @@ export async function checkLiquidations(tx: Tx, marketId: string, debtRateBps = 
 export async function checkGroupLiquidations(
   tx: Tx,
   book: { m: typeof schema.market.$inferSelect; qYes: number; qNo: number; dirty: boolean }[],
-  debtRateBps = GAME_DEBT_RATE_BPS
+  debtRateBps = DEFAULT_DEBT_RATE_BPS
 ) {
   const b = book[0]?.m.b ?? 300;
   let touched = false;
@@ -336,10 +334,10 @@ export async function checkGroupLiquidations(
 // A stop is a resting sell order on one side at a trigger price. The side's
 // *_sell_pct caps the fill to a fraction (null = 100%); the fired trigger is
 // always consumed — a partial fill leaves the rest of the side (and the
-// sibling trigger on it) untouched. Fills pay the same Ɱ1 close fee, service
-// the position loan first, and the wall vow garnishes the remainder —
-// identical money flow to a manual close. Fills iterate to a fixpoint with a
-// hard pass cap: one fill moves the book and can trip the next holder's stop.
+// sibling trigger on it) untouched. Fills pay the same Ɱ1 close fee and
+// service the position loan first — identical money flow to a manual close.
+// Fills iterate to a fixpoint with a hard pass cap: one fill moves the book
+// and can trip the next holder's stop.
 
 const STOP_MAX_PASSES = 50;
 
@@ -373,7 +371,7 @@ function triggeredSide(p: StopRow, pYes: number): Trigger | null {
 }
 
 // Fill one triggered side: price the refund off the book, take the close fee,
-// repay the position loan, garnish the vow share, credit the rest, write the
+// repay the position loan, credit the rest, write the
 // trade + ledger rows, and decrement that side by the filled shares. The
 // fired trigger clears; a surviving remainder keeps the sibling trigger.
 // Drops the row when nothing is left.
@@ -395,7 +393,7 @@ async function fillStop(
   const label = `${trig.kind === "tp" ? "Take-profit" : "Stop-loss"} ${trig.outcome.toUpperCase()} @ ${trig.at.toFixed(2)}${pctNote}: ${m.question.slice(0, 50)}`;
   const skim = Math.min(rest, await garnishDebt(tx, p.userId, rest, label));
   rest -= skim;
-  // Sell row shows proceeds net of debt/vow only — the fee gets its own
+  // Sell row shows proceeds net of debt repayment only — the fee gets its own
   // "fee" ledger row (net balance delta is unchanged).
   if (rest + feeCharge > 0) await credit(tx, p.userId, rest + feeCharge, "sell", m.id, label);
   else {

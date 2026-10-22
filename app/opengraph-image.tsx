@@ -46,7 +46,7 @@ export default function Image() {
 
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <div style={{ width: 64, height: 6, background: "#0f9d58", borderRadius: 3 }} />
-          <div style={{ fontSize: 26, color: "#8fa899" }}>monobet.tdvorak.dev</div>
+          <div style={{ fontSize: 26, color: "#ab9c90" }}>monopredict</div>
         </div>
       </div>
     ),

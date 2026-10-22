@@ -16,8 +16,6 @@ export const BONUSES = [
   { key: "first_bet", amountCents: 10_000, href: null, check: "bet" },
   { key: "first_market", amountCents: 15_000, href: "/propose", check: "market" },
   { key: "first_comment", amountCents: 5_000, href: "/", check: "comment" },
-  { key: "first_game", amountCents: 5_000, href: "/games", check: "game" },
-  { key: "first_win", amountCents: 15_000, href: "/games", check: "win" },
   { key: "avatar", amountCents: 5_000, href: null, check: "avatar" },
   { key: "watchlist", amountCents: 2_500, href: "/markets", check: "watchlist" },
   { key: "heart", amountCents: 2_500, href: "/markets", check: "like" },
@@ -48,13 +46,7 @@ export const REFERRER_BONUS = 20_000;
 // and principal moves aren't earnings.
 export const REFERRAL_ROYALTY_BPS = 500;
 export const REFERRAL_ROYALTY_CAP_CENTS = 200_000; // Ɱ2,000 per invitee — lifetime cap
-export const REFERRAL_EARN_KINDS = ["signup", "claim", "weekly", "ad", "activity", "bonus", "game", "job", "payout", "duel", "tav", "jackpot"] as const;
-
-// Daily jackpot — 4% of game handle pools back into a pot drawn once a day.
-// Every Ɱ10 wagered buys a ticket; the draw weights entries by ticket count.
-export const JACKPOT_RAKE_BPS = 400;
-export const JACKPOT_TICKET_CENTS = 1_000;
-export const JACKPOT_ROUND_MS = 24 * 3600_000;
+export const REFERRAL_EARN_KINDS = ["signup", "claim", "weekly", "ad", "activity", "bonus", "job", "payout", "duel"] as const;
 
 // Claim streaks: gap must stay under 48h (20h cooldown + slack) to keep the
 // streak alive; each streak day adds Marks up to a 7-day cap.

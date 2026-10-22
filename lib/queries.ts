@@ -1,8 +1,7 @@
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { db, schema } from "@/lib/db";
-import { BONUSES, SEASON_LENGTH_MS, SEASON_REWARDS, JACKPOT_RAKE_BPS, JACKPOT_TICKET_CENTS, JACKPOT_ROUND_MS, REFERRAL_EARN_KINDS, REFERRAL_ROYALTY_BPS, REFERRAL_ROYALTY_CAP_CENTS } from "@/lib/rewards";
-import { randomInt } from "node:crypto";
+import { BONUSES, SEASON_LENGTH_MS, SEASON_REWARDS, REFERRAL_EARN_KINDS, REFERRAL_ROYALTY_BPS, REFERRAL_ROYALTY_CAP_CENTS } from "@/lib/rewards";
 import { eq, ne, desc, asc, and, gte, ilike, or, sql, inArray, isNull, isNotNull } from "drizzle-orm";
 import { yesPrice, multiCoords, multiPrices } from "@/lib/lmsr";
 import { accruedDebtCents } from "@/lib/loans";
@@ -475,7 +474,6 @@ export async function getAllUsers() {
       bannedAt: schema.user.bannedAt,
       commentsBanned: schema.user.commentsBanned,
       createdAt: schema.user.createdAt,
-      luckBps: schema.user.luckBps,
     })
     .from(schema.user)
     .orderBy(asc(schema.user.createdAt));
@@ -523,26 +521,13 @@ export async function getHouseStats() {
       .where(sinceCond("game")),
     db
       .select({
-        rigBps: schema.casinoConfig.rigBps,
-        disabledGames: schema.casinoConfig.disabledGames,
-        gameMaxLev: schema.casinoConfig.gameMaxLev,
         tradeMaxLev: schema.casinoConfig.tradeMaxLev,
         levFeeBps: schema.casinoConfig.levFeeBps,
-        gameLevCaps: schema.casinoConfig.gameLevCaps,
-        gameMaxBetCents: schema.casinoConfig.gameMaxBetCents,
         tradeMaxSpendCents: schema.casinoConfig.tradeMaxSpendCents,
-        gameBetCaps: schema.casinoConfig.gameBetCaps,
-        autobetEnabled: schema.casinoConfig.autobetEnabled,
-        gameDailyLimitMs: schema.casinoConfig.gameDailyLimitMs,
-        gameIdleMs: schema.casinoConfig.gameIdleMs,
-        gameFeeCents: schema.casinoConfig.gameFeeCents,
         tradeFeeCents: schema.casinoConfig.tradeFeeCents,
         debtRateBps: schema.casinoConfig.debtRateBps,
         referralRoyaltyBps: schema.casinoConfig.referralRoyaltyBps,
         referralRoyaltyCapCents: schema.casinoConfig.referralRoyaltyCapCents,
-        dicePayBps: schema.casinoConfig.dicePayBps,
-        limboPayBps: schema.casinoConfig.limboPayBps,
-        limboMinX100: schema.casinoConfig.limboMinX100,
         minTradeCents: schema.casinoConfig.minTradeCents,
       })
       .from(schema.casinoConfig)
@@ -609,34 +594,21 @@ export async function getHouseStats() {
       levGame: Number(fees.levGameCents),
       levTrade: Number(fees.levTradeCents),
     },
-    rigBps: cfg[0]?.rigBps ?? 0,
-    disabledGames: cfg[0]?.disabledGames ?? [],
     lev: {
-      gameMaxLev: cfg[0]?.gameMaxLev ?? 10,
       tradeMaxLev: cfg[0]?.tradeMaxLev ?? 10,
       levFeeBps: cfg[0]?.levFeeBps ?? 500,
-      gameLevCaps: cfg[0]?.gameLevCaps ?? {},
-      gameMaxBetCents: cfg[0]?.gameMaxBetCents ?? 100000,
       tradeMaxSpendCents: cfg[0]?.tradeMaxSpendCents ?? 500000,
-      gameBetCaps: cfg[0]?.gameBetCaps ?? {},
     },
     rules: {
-      autobetEnabled: cfg[0]?.autobetEnabled ?? true,
-      gameDailyLimitMs: cfg[0]?.gameDailyLimitMs ?? 7_200_000,
-      gameIdleMs: cfg[0]?.gameIdleMs ?? 1_800_000,
-      gameFeeCents: cfg[0]?.gameFeeCents ?? 100,
       tradeFeeCents: cfg[0]?.tradeFeeCents ?? 100,
       debtRateBps: cfg[0]?.debtRateBps ?? 2000,
       referralRoyaltyBps: cfg[0]?.referralRoyaltyBps ?? 500,
       referralRoyaltyCapCents: cfg[0]?.referralRoyaltyCapCents ?? 200000,
-      dicePayBps: cfg[0]?.dicePayBps ?? 9200,
-      limboPayBps: cfg[0]?.limboPayBps ?? 9600,
-      limboMinX100: cfg[0]?.limboMinX100 ?? 110,
       minTradeCents: cfg[0]?.minTradeCents ?? 1000,
     },
     // Bank position on loans: cash repaid + garnished wins + live debt claims
-    // still on the books, minus cash lent out. Debt forgiven by the wall or
-    // lost to liquidation simply isn't in outstanding — it shows as a loss.
+    // still on the books, minus cash lent out. Debt written off or lost to
+    // liquidation simply isn't in outstanding — it shows as a loss.
     loans: {
       count: loan.count,
       disbursedCents: Number(loan.disbursedCents),
@@ -1069,220 +1041,29 @@ export async function ensureSeason() {
   }
 }
 
-// ---------- daily jackpot ----------
-
-type JackpotEntry = { userId: string; tickets: number };
-
-// Wagers inside a round window, grouped into tickets — 1 per Ɱ10 staked.
-async function jackpotEntries(
-  tx: Pick<typeof db, "select">,
-  startsAt: Date,
-  endsAt?: Date
-): Promise<{ entrants: JackpotEntry[]; totalWagered: number }> {
-  const rows = await tx
-    .select({
-      userId: schema.ledger.userId,
-      wagered: sql<string | null>`sum(-${schema.ledger.amountCents})`,
-    })
-    .from(schema.ledger)
-    .where(
-      and(
-        eq(schema.ledger.kind, "game"),
-        sql`${schema.ledger.amountCents} < 0`,
-        sql`${schema.ledger.createdAt} >= ${startsAt}`,
-        endsAt ? sql`${schema.ledger.createdAt} <= ${endsAt}` : undefined
-      )
-    )
-    .groupBy(schema.ledger.userId);
-  const entrants = rows
-    .map((r) => ({ userId: r.userId, tickets: Math.floor(Number(r.wagered) / JACKPOT_TICKET_CENTS) }))
-    .filter((e) => e.tickets > 0);
-  const totalWagered = rows.reduce((s, r) => s + Number(r.wagered), 0);
-  return { entrants, totalWagered };
-}
-
-// Settle an expired round inside a locked transaction — only wagers placed
-// inside the window count, the pot is the rake share of that handle.
-async function drawJackpot(roundId: string): Promise<boolean> {
-  try {
-    return await db.transaction(async (tx) => {
-      const [round] = await tx
-        .select()
-        .from(schema.jackpotRound)
-        .where(eq(schema.jackpotRound.id, roundId))
-        .for("update")
-        .limit(1);
-      if (!round || round.drawnAt) return false;
-      const { entrants, totalWagered } = await jackpotEntries(tx, round.startsAt, round.drawAt);
-      const totalTickets = entrants.reduce((s, e) => s + e.tickets, 0);
-      const poolCents = Math.round((totalWagered * JACKPOT_RAKE_BPS) / 10_000);
-      let winnerId: string | null = null;
-      if (totalTickets > 0) {
-        let roll = randomInt(totalTickets);
-        for (const e of entrants) {
-          roll -= e.tickets;
-          if (roll < 0) {
-            winnerId = e.userId;
-            break;
-          }
-        }
-      }
-      if (winnerId && poolCents > 0) {
-        // The wall vow claims its share before the pot lands.
-        const skim = Math.min(poolCents, await garnishDebt(tx, winnerId, poolCents, "Jackpot"));
-        const after = await credit(tx, winnerId, poolCents - skim, "jackpot", null, `Daily jackpot — ${totalTickets} tickets in the hat`);
-        await tx.insert(schema.ledger).values({
-          userId: winnerId,
-          amountCents: 0,
-          balanceAfterCents: after,
-          kind: "notify",
-          memo: `You hit the daily jackpot — the pot is yours${skim > 0 ? ` (Ɱ${(skim / 100).toFixed(2)} to debt)` : ""}`,
-        });
-      }
-      await tx
-        .update(schema.jackpotRound)
-        .set({ drawnAt: new Date(), winnerId, poolCents, tickets: totalTickets })
-        .where(eq(schema.jackpotRound.id, round.id));
-      await tx
-        .insert(schema.jackpotRound)
-        .values({ startsAt: round.drawAt, drawAt: new Date(round.drawAt.getTime() + JACKPOT_ROUND_MS) });
-      return true;
-    });
-  } catch {
-    return false;
-  }
-}
-
-// Whoever loads the games page after draw_at settles the round and opens the
-// next — same idempotent lazy-rollover as ensureSeason. cache() dedupes it
-// within a request.
-// Leverage configuration — global caps for games and market orders, the
-// funding-fee rate, and per-game overrides. Read by the games page, the
-// market ticket, and the admin panel so the UI shows exactly what the
-// server will accept.
+// Leverage configuration — the market-order cap, funding-fee rate, and
+// spend cap. Read by the market ticket and the admin panel so the UI shows
+// exactly what the server will accept.
 export async function getLevConfig(): Promise<{
-  gameMaxLev: number;
   tradeMaxLev: number;
   levFeeBps: number;
-  gameLevCaps: Record<string, number> | null;
-  gameMaxBetCents: number;
   tradeMaxSpendCents: number;
-  gameBetCaps: Record<string, number> | null;
-  autobetEnabled: boolean;
-  gameDailyLimitMs: number;
-  gameIdleMs: number;
-  gameFeeCents: number;
-  tradeFeeCents: number;
-  debtRateBps: number;
-  dicePayBps: number;
-  limboPayBps: number;
-  limboMinX100: number;
-  minTradeCents: number;
 }> {
   const [cfg] = await db
     .select({
-      gameMaxLev: schema.casinoConfig.gameMaxLev,
       tradeMaxLev: schema.casinoConfig.tradeMaxLev,
       levFeeBps: schema.casinoConfig.levFeeBps,
-      gameLevCaps: schema.casinoConfig.gameLevCaps,
-      gameMaxBetCents: schema.casinoConfig.gameMaxBetCents,
       tradeMaxSpendCents: schema.casinoConfig.tradeMaxSpendCents,
-      gameBetCaps: schema.casinoConfig.gameBetCaps,
-      autobetEnabled: schema.casinoConfig.autobetEnabled,
-      gameDailyLimitMs: schema.casinoConfig.gameDailyLimitMs,
-      gameIdleMs: schema.casinoConfig.gameIdleMs,
-      gameFeeCents: schema.casinoConfig.gameFeeCents,
-      tradeFeeCents: schema.casinoConfig.tradeFeeCents,
-      debtRateBps: schema.casinoConfig.debtRateBps,
-      dicePayBps: schema.casinoConfig.dicePayBps,
-      limboPayBps: schema.casinoConfig.limboPayBps,
-      limboMinX100: schema.casinoConfig.limboMinX100,
-      minTradeCents: schema.casinoConfig.minTradeCents,
     })
     .from(schema.casinoConfig)
     .where(eq(schema.casinoConfig.id, "house"))
     .limit(1);
   return {
-    gameMaxLev: cfg?.gameMaxLev ?? 10,
     tradeMaxLev: cfg?.tradeMaxLev ?? 10,
     levFeeBps: cfg?.levFeeBps ?? 500,
-    gameLevCaps: cfg?.gameLevCaps ?? null,
-    gameMaxBetCents: cfg?.gameMaxBetCents ?? 100000,
     tradeMaxSpendCents: cfg?.tradeMaxSpendCents ?? 500000,
-    gameBetCaps: cfg?.gameBetCaps ?? null,
-    autobetEnabled: cfg?.autobetEnabled ?? true,
-    gameDailyLimitMs: cfg?.gameDailyLimitMs ?? 7_200_000,
-    gameIdleMs: cfg?.gameIdleMs ?? 1_800_000,
-    gameFeeCents: cfg?.gameFeeCents ?? 100,
-    tradeFeeCents: cfg?.tradeFeeCents ?? 100,
-    debtRateBps: cfg?.debtRateBps ?? 2000,
-    dicePayBps: cfg?.dicePayBps ?? 9200,
-    limboPayBps: cfg?.limboPayBps ?? 9600,
-    limboMinX100: cfg?.limboMinX100 ?? 110,
-    minTradeCents: cfg?.minTradeCents ?? 1000,
   };
 }
-
-// Admin's disabled-game list — cheap, no cache: the kill-switch must show up
-// on the lobby the moment it's flipped.
-export async function getDisabledGames(): Promise<string[]> {
-  const [cfg] = await db
-    .select({ d: schema.casinoConfig.disabledGames })
-    .from(schema.casinoConfig)
-    .where(eq(schema.casinoConfig.id, "house"))
-    .limit(1);
-  return cfg?.d ?? [];
-}
-
-export const getJackpot = cache(async (userId?: string) => {
-  for (let i = 0; i < 4; i++) {
-    const [round] = await db
-      .select()
-      .from(schema.jackpotRound)
-      .where(isNull(schema.jackpotRound.drawnAt))
-      .orderBy(desc(schema.jackpotRound.drawAt))
-      .limit(1);
-    if (!round) {
-      try {
-        await db.insert(schema.jackpotRound).values({ drawAt: new Date(Date.now() + JACKPOT_ROUND_MS) });
-      } catch {
-        // a concurrent first insert lost nothing — re-read
-      }
-      continue;
-    }
-    if (round.drawAt.getTime() <= Date.now()) {
-      await drawJackpot(round.id);
-      continue;
-    }
-    const { entrants, totalWagered } = await jackpotEntries(db, round.startsAt);
-    const totalTickets = entrants.reduce((s, e) => s + e.tickets, 0);
-    const poolCents = Math.round((totalWagered * JACKPOT_RAKE_BPS) / 10_000);
-    const yourTickets = userId ? (entrants.find((e) => e.userId === userId)?.tickets ?? 0) : 0;
-    const [last] = await db
-      .select()
-      .from(schema.jackpotRound)
-      .where(isNotNull(schema.jackpotRound.drawnAt))
-      .orderBy(desc(schema.jackpotRound.drawAt))
-      .limit(1);
-    let lastWinner: { username: string | null; name: string } | null = null;
-    if (last?.winnerId) {
-      const [w] = await db
-        .select({ username: schema.user.username, name: schema.user.name })
-        .from(schema.user)
-        .where(eq(schema.user.id, last.winnerId))
-        .limit(1);
-      lastWinner = w ?? null;
-    }
-    return {
-      drawAt: round.drawAt,
-      poolCents,
-      totalTickets,
-      yourTickets,
-      last: last ? { winner: lastWinner, poolCents: last.poolCents, tickets: last.tickets } : null,
-    };
-  }
-  return null;
-});
 
 export async function getSeasonHistory(limit = 4) {
   const seasons = await db
@@ -1599,30 +1380,6 @@ export async function getNoteCounts(marketIds: string[]) {
     .groupBy(schema.communityNote.marketId);
   for (const r of rows) map.set(r.marketId, r.n);
   return map;
-}
-
-// Public prayer wall — the latest sacrifices at the Wall of Debts.
-export async function getWallPrayers(limit = 12) {
-  return db
-    .select({
-      id: schema.wallPrayer.id,
-      note: schema.wallPrayer.note,
-      feeCents: schema.wallPrayer.feeCents,
-      clearedCents: schema.wallPrayer.clearedCents,
-      miracle: schema.wallPrayer.miracle,
-      createdAt: schema.wallPrayer.createdAt,
-      username: schema.user.username,
-      name: schema.user.name,
-    })
-    .from(schema.wallPrayer)
-    .innerJoin(schema.user, eq(schema.wallPrayer.userId, schema.user.id))
-    .orderBy(desc(schema.wallPrayer.createdAt))
-    .limit(limit);
-}
-
-// Blackjack dealers — admin panel lists all; rounds pick from active ones.
-export async function listDealers() {
-  return db.select().from(schema.dealerPersona).orderBy(schema.dealerPersona.createdAt);
 }
 
 // Duels involving this user — opponent/creator names joined for display.

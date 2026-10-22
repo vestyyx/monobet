@@ -351,6 +351,13 @@
       "when": 1792413871860,
       "tag": "0049_jobs",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1792691730982,
+      "tag": "0050_phase1-no-casino",
+      "breakpoints": true
     }
   ]
 }

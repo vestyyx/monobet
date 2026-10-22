@@ -59,22 +59,9 @@ export const user = pgTable("user", {
   debtSince: timestamp("debt_since", { withTimezone: true }),
   // Owed to the squad pot — interest-free, but you can't leave until repaid.
   squadDebtCents: bigint("squad_debt_cents", { mode: "number" }).notNull().default(0),
-  // The Wall — last prayer timestamp for the cooldown, and the vow: a pledged
-  // share of every win (bps) garnished to debt until it's clear.
-  wallPrayerAt: timestamp("wall_prayer_at", { withTimezone: true }),
-  vowBps: integer("vow_bps").notNull().default(0),
-  // Auto-repay: when on, winnings feed the debt in full (vow = 100%) and each
-  // stake/trade first pays down the loan from spare balance.
+  // Auto-repay: when on, each loan repayment/trade first pays down the loan
+  // and winnings feed the debt in full.
   autoRepay: boolean("auto_repay").notNull().default(false),
-  // Admin-tuned luck: bps chance to rescue a loss into a win (− = unlucky).
-  // Random games only — skill games (timer, blackjack) ignore it.
-  luckBps: integer("luck_bps").notNull().default(0),
-  // Minigame daily cap: game_session_start anchors the rolling 24h window
-  // (first stake of the day); game_played_ms banks in-game time and
-  // game_last_play_at marks the last stake so ≥30min gaps don't accrue.
-  gameSessionStart: timestamp("game_session_start", { withTimezone: true }),
-  gameLastPlayAt: timestamp("game_last_play_at", { withTimezone: true }),
-  gamePlayedMs: bigint("game_played_ms", { mode: "number" }).notNull().default(0),
   // Notification prefs — resolve fan-out and closing-soon reminders.
   notifResolve: boolean("notif_resolve").notNull().default(true),
   notifClosing: boolean("notif_closing").notNull().default(true),
@@ -388,83 +375,6 @@ export const communityNote = pgTable(
   (t) => [index("community_note_market_idx").on(t.marketId, t.createdAt)]
 );
 
-// ---------- blackjack ----------
-
-// Notes left at the Wall of Debts — public ledger of who begged for relief.
-export const wallPrayer = pgTable("wall_prayer", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
-  note: text("note").notNull().default(""),
-  feeCents: bigint("fee_cents", { mode: "number" }).notNull(),
-  clearedCents: bigint("cleared_cents", { mode: "number" }).notNull(),
-  miracle: boolean("miracle").notNull().default(false),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
-// Dealer personas — admin-configured characters that front the automated
-// blackjack dealer. Each round snapshots the persona so edits can't
-// rewrite history.
-export const dealerPersona = pgTable("dealer_persona", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  name: text("name").notNull(),
-  avatar: text("avatar").notNull().default(""),
-  quipWin: text("quip_win").notNull().default(""), // shown when the dealer wins
-  quipLose: text("quip_lose").notNull().default(""), // dealer loses or pushes
-  active: boolean("active").notNull().default(true),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
-// A live blackjack hand — deck and cards live server-side so hit/stand can't
-// forge draws. Settles inside the deal/hit/stand actions via settleGame.
-export const blackjackRound = pgTable(
-  "blackjack_round",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
-    betCents: integer("bet_cents").notNull(),
-    leverage: integer("leverage").notNull().default(1),
-    deck: jsonb("deck").notNull().$type<number[]>(), // remaining shoe, ints 0-51
-    player: jsonb("player").notNull().$type<number[]>(),
-    dealer: jsonb("dealer").notNull().$type<number[]>(),
-    persona: jsonb("persona").notNull().$type<{ name: string; avatar: string; quipWin: string; quipLose: string }>(),
-    status: text("status").notNull().default("playing"), // playing | settled
-    result: text("result"), // win | lose | push | blackjack | surrender
-    netCents: integer("net_cents"),
-    loanCents: bigint("loan_cents", { mode: "number" }).notNull().default(0), // leverage funding fee paid at deal (legacy name)
-    // Side bets settled at deal time — stake, payout, and the hand label hit.
-    sides: jsonb("sides").$type<Record<string, { stake: number; winCents: number; label: string | null }>>(),
-    doubled: boolean("doubled").notNull().default(false),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    settledAt: timestamp("settled_at", { withTimezone: true }),
-  },
-  (t) => [index("blackjack_round_user_idx").on(t.userId, t.createdAt)]
-);
-
-// One row per stop-the-timer round. The stake is debited when the row is
-// created — an abandoned round forfeits the wager, and the atomic settled_at
-// claim makes the round single-use (no token replay, no forged elapsed).
-export const timerRound = pgTable(
-  "timer_round",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
-    targetMs: integer("target_ms").notNull(),
-    // Hidden ±ms offset added at start; the round grades elapsed against
-    // target+jitter so a pre-timed stop request can't snipe the top tier.
-    jitterMs: integer("jitter_ms").notNull().default(0),
-    betCents: integer("bet_cents").notNull(),
-    leverage: integer("leverage").notNull().default(1),
-    feeCents: integer("fee_cents").notNull().default(0), // leverage funding fee, burned at start
-    settledAt: timestamp("settled_at", { withTimezone: true }),
-    // App-clock anchor captured at action entry — grading uses this, not
-    // created_at (Postgres now()), so DB clock skew and insert latency can't
-    // leak into the measured elapsed.
-    startedAt: timestamp("started_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [index("timer_round_user_idx").on(t.userId, t.createdAt)]
-);
-
 export const jobShift = pgTable(
   "job_shift",
   {
@@ -478,24 +388,6 @@ export const jobShift = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("job_shift_user_idx").on(t.userId, t.createdAt)]
-);
-
-// Hi-Lo — the server deals the face card at start (stake charged), the
-// player's direction commits at play and the next card settles the round.
-export const hiloRound = pgTable(
-  "hilo_round",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
-    faceCard: integer("face_card").notNull(),
-    betCents: integer("bet_cents").notNull(),
-    leverage: integer("leverage").notNull().default(1),
-    feeCents: integer("fee_cents").notNull().default(0),
-    dir: text("dir"),
-    settledAt: timestamp("settled_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [index("hilo_round_user_idx").on(t.userId, t.createdAt)]
 );
 
 // ---------- squads ----------
@@ -544,8 +436,8 @@ export const challenge = pgTable(
     opponentId: text("opponent_id").notNull().references(() => user.id, { onDelete: "cascade" }),
     claim: text("claim").notNull(),
     stakeCents: integer("stake_cents").notNull(),
-    // claim = the classic text bet; rps/roll/wheel/slots are server-resolved
-    // minigames — moves and rolls live in state.
+    // claim = the classic text bet; rps/roll are server-resolved party games —
+    // picks and rolls live in state.
     kind: text("kind").notNull().default("claim"),
     state: jsonb("state"),
     status: text("status").notNull().default("open"), // open|accepted|declined|cancelled|settled|disputed
@@ -585,62 +477,29 @@ export const marketLike = pgTable(
   (t) => [primaryKey({ columns: [t.userId, t.marketId] }), index("market_like_market_idx").on(t.marketId)]
 );
 
-// ---------- casino tuning ----------
+// ---------- house config ----------
 
-// Single-row house config ("house"): rig_bps quietly flips that share of
-// player wins into losses across the random games. Admin-editable.
+// Single-row config ("house") holding the admin-tunable economy knobs:
+// trade leverage caps, fees, loan APR, referral royalties.
 export const casinoConfig = pgTable("casino_config", {
   id: text("id").primaryKey(),
-  rigBps: integer("rig_bps").notNull().default(0),
-  // Admin kill-switch — canonical game keys that refuse new stakes.
-  disabledGames: text("disabled_games").array().notNull().default(sql`'{}'::text[]`),
-  // Leverage knobs — admin-settable. gameMaxLev caps every minigame,
-  // tradeMaxLev caps market orders, levFeeBps is the funding fee on borrowed
-  // notional (both games and leveraged trades), gameLevCaps overrides per
-  // game key ({"dice":5}).
-  gameMaxLev: integer("game_max_lev").notNull().default(10),
+  // Leverage knobs — admin-settable. tradeMaxLev caps market orders,
+  // levFeeBps is the funding fee on borrowed notional.
   tradeMaxLev: integer("trade_max_lev").notNull().default(10),
   levFeeBps: integer("lev_fee_bps").notNull().default(500),
-  gameLevCaps: jsonb("game_lev_caps").$type<Record<string, number>>(),
-  // Stake ceilings — admin-settable. gameMaxBetCents is the default per-round
-  // base-stake cap, gameBetCaps overrides per game key, tradeMaxSpendCents
-  // caps a market order's own-cash spend; a market's max_bet_cents column can
-  // tighten that per market.
-  gameMaxBetCents: integer("game_max_bet_cents").notNull().default(100000),
+  // tradeMaxSpendCents caps a market order's own-cash spend; a market's
+  // max_bet_cents column can tighten that per market.
   tradeMaxSpendCents: integer("trade_max_spend_cents").notNull().default(500000),
-  gameBetCaps: jsonb("game_bet_caps").$type<Record<string, number>>(),
-  // House rules — formerly hardcoded, now admin-tunable. autobetEnabled gates
-  // the autobet UI; the session clock caps in-game ms per 24h window, with
-  // idleMs the gap that pauses it. Fee columns are the flat round/order fees;
-  // debtRateBps is the loan APR; dice/limbo pay columns scale the fair odds.
-  autobetEnabled: boolean("autobet_enabled").notNull().default(true),
-  gameDailyLimitMs: integer("game_daily_limit_ms").notNull().default(7_200_000),
-  gameIdleMs: integer("game_idle_ms").notNull().default(1_800_000),
-  gameFeeCents: integer("game_fee_cents").notNull().default(100),
+  // House rules — admin-tunable. tradeFeeCents is the flat order fee;
+  // debtRateBps is the loan APR.
   tradeFeeCents: integer("trade_fee_cents").notNull().default(100),
   debtRateBps: integer("debt_rate_bps").notNull().default(2000),
   referralRoyaltyBps: integer("referral_royalty_bps").notNull().default(500),
   referralRoyaltyCapCents: integer("referral_royalty_cap_cents").notNull().default(200_000),
-  dicePayBps: integer("dice_pay_bps").notNull().default(9200),
-  limboPayBps: integer("limbo_pay_bps").notNull().default(9600),
-  limboMinX100: integer("limbo_min_x100").notNull().default(110),
   minTradeCents: integer("min_trade_cents").notNull().default(1000),
   // Economy resets move this forward: bank stats and balance-history charts
   // only count ledger rows after the epoch — whale-era churn stays in the
   // ledger for audit but out of the displayed numbers.
   statsSince: timestamp("stats_since", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
-// Daily jackpot — a share of every game's handle pools into a pot drawn once
-// a day; each wagered ticket is a weighted entry. The draw itself happens
-// lazily in getJackpot() when the first request lands after draw_at.
-export const jackpotRound = pgTable("jackpot_round", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  startsAt: timestamp("starts_at", { withTimezone: true }).notNull().defaultNow(),
-  drawAt: timestamp("draw_at", { withTimezone: true }).notNull(),
-  drawnAt: timestamp("drawn_at", { withTimezone: true }),
-  winnerId: text("winner_id").references(() => user.id, { onDelete: "set null" }),
-  poolCents: bigint("pool_cents", { mode: "number" }).notNull().default(0),
-  tickets: integer("tickets").notNull().default(0),
 });

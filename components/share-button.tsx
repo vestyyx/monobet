@@ -50,7 +50,7 @@ export function ShareButton({
       const blob = await res.blob();
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = `monobet-${cleanPath.split("/").pop()}.png`;
+      a.download = `monopredict-${cleanPath.split("/").pop()}.png`;
       a.click();
       URL.revokeObjectURL(a.href);
       setOpen(false);

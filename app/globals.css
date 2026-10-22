@@ -3,67 +3,69 @@
 @theme {
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 
-  /* MonoBet brand: the logo's green — Yes energy, never Vercel black */
-  --color-brand: #0f9d58;
-  --color-brand-strong: #0b7a44;
-  --color-brand-soft: #e5f5ec;
+  /* MonoPredict brand: sunny apricot — playful, warm, zero betting-hall vibes.
+     Sunny amber for the brand voice; a friendly green/red only for market
+     outcomes (YES/NO), softened so nothing screams "odds board". */
+  --color-brand: #f08a1d;
+  --color-brand-strong: #cf6f0e;
+  --color-brand-soft: #fdeedb;
   --color-brand-on: #ffffff;
 
-  --color-canvas: #eef1ee;
-  --color-ink: #131a15;
-  --color-ink-2: #3c453e;
-  --color-mute: #5f6862;
-  --color-faint: #878e87;
-  --color-line: #d8ddd9;
-  --color-line-2: #e4e8e5;
+  --color-canvas: #faf5ee;
+  --color-ink: #2b2320;
+  --color-ink-2: #574841;
+  --color-mute: #85746a;
+  --color-faint: #ab9c90;
+  --color-line: #e9dccd;
+  --color-line-2: #f1e8dc;
   --color-surface: #ffffff;
-  --color-surface-2: #f5f7f5;
-  --color-surface-3: #e6eae8;
+  --color-surface-2: #fcf8f2;
+  --color-surface-3: #f4ebdf;
 
-  --color-yes: #0f9d58;
-  --color-yes-soft: #dff1e6;
-  --color-yes-strong: #0b7a44;
+  --color-yes: #2f9e63;
+  --color-yes-soft: #e2f3e9;
+  --color-yes-strong: #227a4b;
   --color-yes-on: #ffffff;
-  --color-no: #e03c31;
-  --color-no-soft: #fce4e0;
-  --color-no-strong: #b8281f;
+  --color-no: #e2564d;
+  --color-no-soft: #fce8e6;
+  --color-no-strong: #b93830;
   --color-no-on: #ffffff;
 
-  --color-warn-soft: #fceecf;
-  --color-warn-strong: #92600a;
+  --color-warn-soft: #fdf0d5;
+  --color-warn-strong: #8a5a00;
 
-  --radius-card: 14px;
+  --radius-card: 16px;
 }
 
-/* Dark theme — same tokens, inverted values. Every component adapts. */
+/* Dark theme — same tokens, inverted onto warm cocoa. Every component adapts. */
 .dark {
-  --color-canvas: #10140f;
-  --color-brand: #34c47a;
-  --color-brand-strong: #4fe096;
-  --color-brand-soft: #12291d;
-  --color-brand-on: #0c140f;
+  --color-canvas: #171210;
+  --color-brand: #f5a54a;
+  --color-brand-strong: #ffc074;
+  --color-brand-soft: #33230f;
+  --color-brand-on: #1a1208;
 
-  --color-ink: #eef3ee;
-  --color-ink-2: #c2cbc3;
-  --color-mute: #899289;
-  --color-faint: #59625b;
-  --color-line: #252c27;
-  --color-line-2: #1c221d;
-  --color-surface: #10140f;
-  --color-surface-2: #171d18;
-  --color-surface-3: #212820;
+  --color-ink: #f3ece3;
+  --color-ink-2: #cfc0b2;
+  --color-mute: #9a897b;
+  --color-faint: #6b5d51;
+  --color-line: #2e2521;
+  --color-line-2: #251e1a;
+  --color-surface: #171210;
+  --color-surface-2: #1e1915;
+  --color-surface-3: #27201b;
 
-  --color-yes: #34c47a;
-  --color-yes-soft: #12291d;
-  --color-yes-strong: #4fe096;
-  --color-yes-on: #0c140f;
-  --color-no: #f0604f;
-  --color-no-soft: #341d1b;
-  --color-no-strong: #ff9387;
-  --color-no-on: #ffffff;
+  --color-yes: #4dbb82;
+  --color-yes-soft: #17301f;
+  --color-yes-strong: #7bd6a2;
+  --color-yes-on: #102014;
+  --color-no: #ef7a71;
+  --color-no-soft: #34201d;
+  --color-no-strong: #ffa199;
+  --color-no-on: #230f0d;
 
   --color-warn-soft: #2e2410;
-  --color-warn-strong: #e0a93f;
+  --color-warn-strong: #e0b857;
 }
 
 html {
@@ -72,9 +74,9 @@ html {
 }
 
 /* Light mode only: bordered surfaces (cards, chips, inputs) get a whisper of
-   shadow so they sit above the gray canvas instead of reading flat. */
+   shadow so they sit above the warm canvas instead of reading flat. */
 :root:not(.dark) .bg-surface[class*="border-line"] {
-  box-shadow: 0 1px 2px rgb(19 26 21 / 0.05), 0 1px 4px rgb(19 26 21 / 0.04);
+  box-shadow: 0 1px 2px rgb(43 35 32 / 0.05), 0 1px 4px rgb(43 35 32 / 0.04);
 }
 
 body {
@@ -136,16 +138,6 @@ body {
   100% { opacity: 0.55; }
 }
 
-@keyframes dice-shake {
-  0%, 100% { transform: rotate(0deg) translateY(0); }
-  25% { transform: rotate(-9deg) translateY(-2px); }
-  75% { transform: rotate(8deg) translateY(1px); }
-}
-
-.anim-dice-shake {
-  animation: dice-shake 130ms linear infinite;
-}
-
 @keyframes win-pop {
   0% { transform: scale(0.6); opacity: 0; }
   60% { transform: scale(1.12); }
@@ -197,201 +189,8 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .anim-draw, .anim-fade, .anim-ping, .anim-rise, .anim-ticker, .anim-shimmer, .live-dot,
-  .anim-pie-in, .anim-pie-out, .anim-plane-crash, .anim-crash-flash, .anim-plane-veil, .anim-island-zoom,
-  .anim-pride-stripe, .anim-confetti, .anim-pride-veil, .anim-money, .anim-shekel-veil, .anim-gif-pop {
+  .anim-draw, .anim-fade, .anim-ping, .anim-rise, .anim-ticker, .anim-shimmer, .live-dot, .anim-win-pop {
     animation: none;
   }
-  .anim-pie-in { opacity: 1; transform: none; }
-  .anim-plane-crash, .anim-crash-flash { opacity: 0; }
-  .anim-money, .anim-gif-pop { opacity: 1; }
 }
 
-/* Bonnie — cream-pie splat: pops in with a squashy impact, holds, then the
-   whole mass sticks and slides down off the screen, stretching as it goes. */
-@keyframes pie-in {
-  0% { transform: scale(0.12); opacity: 0; }
-  55% { transform: scale(1.09); opacity: 1; }
-  78% { transform: scale(0.965); }
-  100% { transform: scale(1); }
-}
-.anim-pie-in { animation: pie-in 400ms cubic-bezier(0.2, 1.4, 0.35, 1) both; }
-@keyframes pie-out {
-  0%, 56% { transform: translateY(0) scaleY(1); }
-  68% { transform: translateY(3%) scaleY(1.07); }
-  100% { transform: translateY(135%) scaleY(1.3); }
-}
-.anim-pie-out { animation: pie-out 2.15s cubic-bezier(0.5, 0, 0.75, 0.4) both; }
-
-/* J. EPST. — jet sweeps in over the framed island photo, pitches into a
-   dive, and vanishes where the flash blooms on the hillside. Distances are
-   card-relative (px), not viewport — the scene lives inside a bounded frame. */
-@keyframes plane-crash {
-  0% { transform: translate(-300px, 30px) rotate(-6deg); opacity: 0; }
-  10% { opacity: 1; }
-  52% { transform: translate(150px, 92px) rotate(-3deg); opacity: 1; }
-  70% { transform: translate(296px, 150px) rotate(16deg); opacity: 1; }
-  80% { transform: translate(322px, 198px) rotate(50deg); opacity: 1; }
-  87%, 100% { transform: translate(322px, 198px) rotate(50deg); opacity: 0; }
-}
-.anim-plane-crash { animation: plane-crash 2.3s cubic-bezier(0.35, 0.4, 0.6, 1) both; transform-origin: 78% 55%; }
-@keyframes crash-flash {
-  0%, 76% { transform: scale(0); opacity: 0; }
-  82% { transform: scale(1); opacity: 1; }
-  100% { transform: scale(1.8); opacity: 0; }
-}
-.anim-crash-flash { animation: crash-flash 2.3s ease-out both; }
-@keyframes island-zoom {
-  0% { transform: scale(1); }
-  100% { transform: scale(1.12); }
-}
-.anim-island-zoom { animation: island-zoom 2.5s ease-out both; }
-@keyframes plane-veil {
-  0%, 84% { opacity: 1; }
-  100% { opacity: 0; }
-}
-.anim-plane-veil { animation: plane-veil 2.5s ease both; }
-
-/* Clavicular — a bounded flag on a pole waves center-stage on a win:
-   stripes ripple in sequence like cloth while confetti drifts down. */
-@keyframes pride-stripe {
-  0%, 100% { transform: translateY(0) scaleY(1); }
-  50% { transform: translateY(-2.5px) scaleY(1.03); }
-}
-.anim-pride-stripe { animation: pride-stripe 1.05s ease-in-out infinite; }
-@keyframes confetti-fall {
-  0% { transform: translate3d(0, -20px, 0) rotate(0deg); opacity: 1; }
-  88% { opacity: 1; }
-  100% { transform: translate3d(var(--drift, 0px), 460px, 0) rotate(620deg); opacity: 0; }
-}
-.anim-confetti { animation: confetti-fall 2.35s cubic-bezier(0.3, 0.35, 0.6, 1) both; }
-@keyframes pride-veil {
-  0%, 85% { opacity: 1; }
-  100% { opacity: 0; }
-}
-.anim-pride-veil { animation: pride-veil 2.5s ease both; }
-
-/* Bibi — a win under Tel Aviv's man rains shekel notes over the flag. */
-@keyframes money-fall {
-  0% { transform: translate3d(0, -40px, 0) rotate(-12deg); opacity: 0; }
-  7% { opacity: 1; }
-  50% { transform: translate3d(calc(var(--drift, 0px) * 0.6), 220px, 0) rotate(14deg); }
-  88% { opacity: 1; }
-  100% { transform: translate3d(var(--drift, 0px), 460px, 0) rotate(-18deg); opacity: 0; }
-}
-.anim-money { animation: money-fall 2.3s cubic-bezier(0.3, 0.35, 0.6, 1) both; }
-@keyframes shekel-veil {
-  0%, 85% { opacity: 1; }
-  100% { opacity: 0; }
-}
-.anim-shekel-veil { animation: shekel-veil 2.5s ease both; }
-@keyframes gif-pop {
-  0% { transform: scale(0.4); opacity: 0; }
-  55% { transform: scale(1.06); opacity: 1; }
-  100% { transform: scale(1); opacity: 1; }
-}
-.anim-gif-pop { animation: gif-pop 480ms cubic-bezier(0.2, 1.3, 0.36, 1) 120ms both; }
-
-/* The Wall — a night scene: dark sky over old stone, votive candles burning
-   along the ledge, prayer slips tucked into the mortar. */
-.wall-scene {
-  background:
-    /* candle glow rising off the ledge */
-    radial-gradient(120% 90% at 50% 115%, rgba(255,176,66,.28) 0%, rgba(255,176,66,.07) 42%, transparent 68%),
-    /* moon, top-right */
-    radial-gradient(circle at 88% 16%, rgba(240,235,220,.75) 0%, rgba(240,235,220,.35) 6px, transparent 22px),
-    /* sparse stars in the sky half */
-    radial-gradient(circle at 12% 12%, rgba(255,255,255,.5) 0%, transparent 1.6px),
-    radial-gradient(circle at 34% 28%, rgba(255,255,255,.35) 0%, transparent 1.4px),
-    radial-gradient(circle at 55% 9%, rgba(255,255,255,.45) 0%, transparent 1.5px),
-    radial-gradient(circle at 71% 33%, rgba(255,255,255,.3) 0%, transparent 1.3px),
-    radial-gradient(circle at 96% 30%, rgba(255,255,255,.4) 0%, transparent 1.5px),
-    radial-gradient(circle at 22% 40%, rgba(255,255,255,.25) 0%, transparent 1.2px),
-    /* night sky over the wall */
-    linear-gradient(180deg, #0d1020 0%, #1a1620 46%, transparent 47%),
-    linear-gradient(rgba(18,12,8,.5) 2px, transparent 2px) 0 47%/100% 26px,
-    linear-gradient(90deg, rgba(18,12,8,.5) 2px, transparent 2px) 0 47%/66px 26px,
-    linear-gradient(90deg, rgba(18,12,8,.5) 2px, transparent 2px) 33px 60%/66px 26px,
-    linear-gradient(180deg, transparent 46%, #5d4f40 47%, #3f352a 82%, #2c251d 100%);
-}
-/* Stone ledge the candles stand on. */
-.wall-ledge {
-  background: linear-gradient(180deg, #4a3e30 0%, #332a20 100%);
-  box-shadow: 0 -1px 0 rgba(255,214,150,.12) inset, 0 -6px 14px rgba(0,0,0,.45);
-}
-/* Votive candle: ivory wax body with a melted rim. */
-.wall-candle {
-  background: linear-gradient(90deg, #b9a98c 0%, #efe3c8 38%, #d9c9a8 72%, #a39377 100%);
-  border-radius: 2px 2px 1px 1px;
-  box-shadow: 0 -1px 2px rgba(255,255,255,.25) inset;
-}
-.wall-candle--burnt {
-  background: linear-gradient(90deg, #6b5f4c 0%, #8a7a61 40%, #5d5140 100%);
-}
-/* Teardrop flame — rotated square with round corners, hot core to amber tip. */
-.wall-flame {
-  position: absolute;
-  left: 50%;
-  bottom: 100%;
-  width: 7px;
-  height: 10px;
-  margin-left: -3.5px;
-  background: radial-gradient(circle at 50% 78%, #fff6d8 0%, #ffd977 42%, #ff9d2e 78%, rgba(255,120,20,0) 100%);
-  border-radius: 50% 50% 50% 50% / 62% 62% 38% 38%;
-  transform-origin: 50% 100%;
-  animation: wall-flicker 1.9s ease-in-out infinite;
-  filter: drop-shadow(0 0 4px rgba(255,170,60,.85));
-}
-.wall-flame--miracle {
-  width: 9px;
-  height: 14px;
-  margin-left: -4.5px;
-  background: radial-gradient(circle at 50% 78%, #fffbe8 0%, #ffe89a 40%, #ffb52e 78%, rgba(255,140,20,0) 100%);
-  filter: drop-shadow(0 0 8px rgba(255,190,80,.95));
-}
-/* Halo each lit candle throws on the ledge. */
-.wall-candle-glow {
-  position: absolute;
-  left: 50%;
-  bottom: -2px;
-  width: 34px;
-  height: 22px;
-  margin-left: -17px;
-  background: radial-gradient(ellipse at 50% 100%, rgba(255,180,70,.4) 0%, transparent 70%);
-  animation: wall-flicker 2.3s ease-in-out infinite;
-}
-/* Faint smoke wisp off a candle the wall ignored. */
-.wall-smoke {
-  position: absolute;
-  left: 50%;
-  bottom: 100%;
-  width: 3px;
-  height: 14px;
-  margin-left: -1.5px;
-  border-radius: 9999px;
-  background: linear-gradient(180deg, transparent, rgba(190,190,200,.35));
-  animation: wall-smoke 3.4s ease-in-out infinite;
-}
-@keyframes wall-flicker {
-  0%, 100% { transform: scaleY(1) skewX(0deg); opacity: 1; }
-  22% { transform: scaleY(1.08) skewX(-2.4deg); opacity: .92; }
-  45% { transform: scaleY(.94) skewX(1.8deg); opacity: 1; }
-  68% { transform: scaleY(1.12) skewX(-1.2deg); opacity: .88; }
-  84% { transform: scaleY(.97) skewX(2.2deg); }
-}
-@keyframes wall-smoke {
-  0%, 100% { transform: translateY(0) scaleY(1); opacity: .3; }
-  50% { transform: translateY(-5px) scaleY(1.35) skewX(4deg); opacity: .55; }
-}
-.wall-slip {
-  transition: transform 180ms ease;
-}
-.wall-slip:hover {
-  transform: scale(1.6) rotate(0deg) !important;
-  z-index: 20;
-  max-width: none;
-  white-space: normal;
-}
-@media (prefers-reduced-motion: reduce) {
-  .wall-flame, .wall-candle-glow, .wall-smoke { animation: none; }
-}

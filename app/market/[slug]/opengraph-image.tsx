@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 const YES = "#0f9d58";
 const NO = "#e5484d";
 const MUTE = "#8fa899";
-const ORIGIN = "https://monobet.tdvorak.dev";
+const ORIGIN = "https://monopredict.vercel.app";
 
 // Market art may be remote, site-relative, or a data URI — satori needs an
 // absolute URL for the first two.
@@ -178,7 +178,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
             <div style={{ fontSize: 24, color: MUTE }}>
               {`${fmtMonos(volume)} traded · ${traders} traders${closes ? ` · closes ${closes}` : ""}`}
             </div>
-            <div style={{ fontSize: 24, color: MUTE }}>play money only · monobet.tdvorak.dev</div>
+            <div style={{ fontSize: 24, color: MUTE }}>pro zábavu · nemá peněžní hodnotu · monopredict</div>
           </div>
         </div>
       </div>

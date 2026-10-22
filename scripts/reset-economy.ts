@@ -1,6 +1,5 @@
-// One-shot ops: reset the daily jackpot and run the economy reset on the
-// configured DATABASE_URL. Runs the SAME transaction bodies as the admin
-// actions (lib/economy-reset.ts) — not a copy.
+// One-shot ops: run the economy reset on the configured DATABASE_URL. Runs the
+// SAME transaction body as the admin action (lib/economy-reset.ts) — not a copy.
 //   npx tsx scripts/reset-economy.ts          # dry run — reports, no writes
 //   npx tsx scripts/reset-economy.ts --apply  # executes
 import { config } from "dotenv";
@@ -10,7 +9,7 @@ const APPLY = process.argv.includes("--apply");
 
 async function main() {
   const { db, schema, pool } = await import("../lib/db");
-  const { isNull, sql } = await import("drizzle-orm");
+  const { sql } = await import("drizzle-orm");
   const { resetEconomyTx, WHALE_CAP_CENTS } = await import("../lib/economy-reset");
   const exemptEmail = (process.env.SUPER_ADMIN_EMAIL ?? "").toLowerCase();
 
@@ -31,18 +30,10 @@ async function main() {
   }
 
   const result = await db.transaction(async (tx) => {
-    // Jackpot reset — same update as resetJackpot(): moving starts_at zeroes
-    // the live pool and tickets while the draw cadence carries on.
-    const jr = await tx
-      .update(schema.jackpotRound)
-      .set({ startsAt: new Date(), poolCents: 0, tickets: 0 })
-      .where(isNull(schema.jackpotRound.drawnAt))
-      .returning({ id: schema.jackpotRound.id });
     const eco = await resetEconomyTx(tx, { exemptEmail });
-    return { jackpotRounds: jr.length, ...eco };
+    return eco;
   });
-  console.log(`\njackpot rounds reset: ${result.jackpotRounds}`);
-  console.log(`positions unwound: ${result.unwound}`);
+  console.log(`\npositions unwound: ${result.unwound}`);
   console.log(`balances clamped: ${result.clamped}`);
   console.log(`whale trades purged: ${result.purgedTrades}`);
   console.log(`markets recounted: ${result.recounted}`);

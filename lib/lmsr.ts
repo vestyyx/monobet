@@ -2,9 +2,8 @@
 // qYes/qNo = net shares issued per outcome. Prices are probabilities in (0,1).
 // Buying pushes the price toward 1; selling back reduces outstanding shares.
 
-// One trade can't move more than this in notional (spend × leverage) — same
-// ceiling the casino games use, so neither side of the app takes a six-figure
-// hit in one click.
+// One trade can't move more than this in notional (spend × leverage), so
+// nobody can take a six-figure hit in one click.
 export const MAX_TRADE_CENTS = 100_000_00;
 
 // Per-order caps: the cash a trader commits is capped at Ɱ5 000; leverage

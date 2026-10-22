@@ -38,7 +38,7 @@ export function AuthForm({ lang, inviter }: { lang?: Lang; inviter?: Inviter }) 
           // username plugin stores username; email is required by core, so a
           // local placeholder keeps signups friction-free unless a real one
           // is given (e.g. the owner's superadmin email).
-          email: customEmail || `${username.trim().toLowerCase()}@monobet.local`,
+          email: customEmail || `${username.trim().toLowerCase()}@monopredict.local`,
           name: username.trim(),
           username: username.trim().toLowerCase(),
           password,

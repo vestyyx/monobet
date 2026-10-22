@@ -8,7 +8,6 @@ import { LOAN_PRESETS_CENTS, LOAN_OFFER_COUNT } from "@/lib/loans";
 import { getT, type Lang } from "@/lib/i18n";
 import { AD_WATCH_MS } from "@/lib/rewards";
 import { fmtMonos } from "@/lib/money";
-import { WallCard, type WallPrayerRow } from "@/components/wall-card";
 import { playSfx } from "@/lib/sfx";
 import {
   CalendarCheck,
@@ -273,7 +272,7 @@ function AdCard({ nextAt, amount, t }: { nextAt: number | null; amount: string; 
 function InviteCard({ username, lang }: { username: string; lang: Lang }) {
   const t = getT(lang);
   const [copied, setCopied] = useState(false);
-  const link = `https://monobet.tdvorak.dev/login?ref=${encodeURIComponent(username)}`;
+  const link = `https://monopredict.vercel.app/login?ref=${encodeURIComponent(username)}`;
   return (
     <div className="rounded-xl border border-line bg-surface p-4 flex items-center gap-3">
       <div className="size-9 rounded-lg bg-brand-soft text-brand-strong flex items-center justify-center shrink-0">
@@ -547,8 +546,7 @@ export function RewardsPanels({
   referrals,
   royaltyDueCents,
   debt,
-  wall,
-  wallNow,
+  balanceCents,
 }: {
   lang: Lang;
   daily: Recurring;
@@ -560,8 +558,7 @@ export function RewardsPanels({
   referrals: ReferralRow[];
   royaltyDueCents: number;
   debt: { cents: number; rateBps: number };
-  wall: { prayerAt: Date | null; vowBps: number; prayers: WallPrayerRow[]; balanceCents: number };
-  wallNow: number;
+  balanceCents: number;
 }) {
   const t = getT(lang);
   const [pending, start] = useTransition();
@@ -574,8 +571,6 @@ export function RewardsPanels({
     first_bet: { title: t.bonusFirstBet, desc: t.bonusFirstBetDesc },
     first_market: { title: t.bonusFirstMarket, desc: t.bonusFirstMarketDesc },
     first_comment: { title: t.bonusFirstComment, desc: t.bonusFirstCommentDesc },
-    first_game: { title: t.bonusFirstGame, desc: t.bonusFirstGameDesc },
-    first_win: { title: t.bonusFirstWin, desc: t.bonusFirstWinDesc },
     avatar: { title: t.bonusAvatar, desc: t.bonusAvatarDesc },
     watchlist: { title: t.bonusWatchlist, desc: t.bonusWatchlistDesc },
     heart: { title: t.bonusHeart, desc: t.bonusHeartDesc },
@@ -621,10 +616,7 @@ export function RewardsPanels({
           <AdCard nextAt={ad.nextAt} amount={ad.amount} t={t} />
         </div>
         <div className="mt-3">
-          <LoanCard debtCents={debt.cents} rateBps={debt.rateBps} balanceCents={wall.balanceCents} t={t} lang={lang} />
-        </div>
-        <div className="mt-3">
-          <WallCard debtCents={debt.cents} wallPrayerAt={wall.prayerAt} vowBps={wall.vowBps} prayers={wall.prayers} lang={lang} now={wallNow} balanceCents={wall.balanceCents} />
+          <LoanCard debtCents={debt.cents} rateBps={debt.rateBps} balanceCents={balanceCents} t={t} lang={lang} />
         </div>
       </section>
 

@@ -21,9 +21,9 @@ export type NotifItem = {
 type NotifState = { read: string[]; cleared: string[] };
 const EMPTY: NotifState = { read: [], cleared: [] };
 
-const stateKey = (userId: string) => `monobet.notif.${userId}`;
-const legacyKey = (userId: string) => `monobet.notifSeen.${userId}`;
-const NOTIF_EVENT = "monobet-notif";
+const stateKey = (userId: string) => `monopredict.notif.${userId}`;
+const legacyKey = (userId: string) => `monopredict.notifSeen.${userId}`;
+const NOTIF_EVENT = "monopredict-notif";
 
 // Parsed snapshots are cached so getSnapshot returns a stable reference.
 const parseCache = new Map<string, { raw: string | null; state: NotifState }>();

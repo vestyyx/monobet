@@ -41,12 +41,7 @@ export const auth = betterAuth({
       debtSince: { type: "date", required: false, input: false },
       squadId: { type: "string", required: false, input: false },
       squadDebtCents: { type: "number", required: false, input: false },
-      wallPrayerAt: { type: "date", required: false, input: false },
-      vowBps: { type: "number", required: false, input: false },
-      luckBps: { type: "number", required: false, input: false },
-      gameSessionStart: { type: "date", required: false, input: false },
-      gameLastPlayAt: { type: "date", required: false, input: false },
-      gamePlayedMs: { type: "number", required: false, input: false },
+
     },
   },
   // Bans are read-only, not lockouts: suspended users still sign in and

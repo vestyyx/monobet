@@ -65,14 +65,3 @@ export function levFeeCents(betCents: number, leverage: number, bps = LEV_FEE_BP
   if (leverage <= 1) return 0;
   return Math.round(betCents * (leverage - 1) * (levFeeBpsEff(leverage, bps) / 10_000));
 }
-// Raw (unfloored) return: stake back plus amplified profit — can go negative
-// at sub-1x multipliers under leverage; the negative part is the unpaid
-// borrowed loss, booked as debt.
-export function levWinRawCents(betCents: number, leverage: number, mult: number): number {
-  return Math.round(betCents * (1 + (mult - 1) * leverage));
-}
-// Win payout under margin rules: floored at zero for crediting — the
-// remainder below zero is debt, not a bigger payout.
-export function levWinCents(betCents: number, leverage: number, mult: number): number {
-  return Math.max(0, levWinRawCents(betCents, leverage, mult));
-}

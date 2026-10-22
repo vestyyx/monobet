@@ -13,9 +13,9 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://monobet.tdvorak.dev"),
-  title: { default: "MonoPredict — Platforma pro kolektivní prognózování", template: "MonoPredict — %s" },
-  description: "MonoPredict — Platforma pro kolektivní prognózování",
+  metadataBase: new URL("https://monopredict.vercel.app"),
+  title: { default: "MonoPredict — Přátelské tipování s rodinou a kamarády", template: "MonoPredict — %s" },
+  description: "MonoPredict — přátelské soutěže a prognózy pro rodinu a třídu. Jen pro zábavu, Mony nemají žádnou hodnotu.",
   openGraph: {
     siteName: "MonoPredict",
     type: "website",
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0f9d58",
+  themeColor: "#f08a1d",
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
