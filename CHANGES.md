@@ -2,6 +2,13 @@
 
 This fork of **MonoBet** (upstream: https://github.com/Dvorinka/monobet) is being reworked into **MonoPredict** — a private, family-and-friends forecasting game. Sunčný, family-friendly, no gambling. Mony (Ɱ) are play points with no monetary value.
 
+## Shipping — CI, roadmap, production deploy (merged via PR #3)
+- **`ROADMAP.md`** added at repo root: single tracker for the whole rebuild (milestones table, done details, games batches 2–3, admin phases 2–7 spec, architecture decisions, file map, env/ops, working rules).
+- **`.github/workflows/ci.yml`**: typecheck + lint + vitest on every push/PR (Node 22). From now on PRs must be green before merging.
+- First PR flow completed: PR [#3](https://github.com/vestyyx/monobet/pull/3) → CI green (`check ✓`) → merged (`86e4140`, merge commit kept).
+- **Production deployed on Vercel**: project `monopredict` (team `vertyx1`), canonical URL **https://monopredict.vercel.app** — homepage, `/markets`, `/login`, `/games` all 200; env vars (pooled `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL=https://monopredict.vercel.app`, `SUPER_ADMIN_EMAIL`) set for production. The GitHub repo is also connected to Vercel for automatic preview deploys per PR.
+- Ops helper `scripts/push-vercel-env.ps1` — pushes app env vars from `.env.local` to Vercel production (values never printed).
+
 ## Phase 2 — admin panel rebuild (in progress)
 
 ### Games batch 1 — Daily Trivia + Closest Guess (committed)
