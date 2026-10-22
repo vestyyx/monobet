@@ -358,6 +358,13 @@
       "when": 1792691730982,
       "tag": "0050_phase1-no-casino",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1792692288189,
+      "tag": "0051_phase2-admin-core",
+      "breakpoints": true
     }
   ]
 }

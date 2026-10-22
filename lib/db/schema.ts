@@ -51,6 +51,12 @@ export const user = pgTable("user", {
   commentsBanned: boolean("comments_banned").notNull().default(false),
   // Temporary comment ban — a "timeout" that expires on its own.
   commentBanUntil: timestamp("comment_ban_until", { withTimezone: true }),
+  // Admin-set restrictions (Phase 2+ money tools read these):
+  // frozenAt blocks balance-earning/moving actions; kidMode enables stricter
+  // limits; maxStakeCents caps this player's per-order stake (null = default).
+  frozenAt: timestamp("frozen_at", { withTimezone: true }),
+  kidMode: boolean("kid_mode").notNull().default(false),
+  maxStakeCents: integer("max_stake_cents"),
   squadId: uuid("squad_id"),
   // House debt — voluntary loans land here (levered games never borrow). Rate is APR in
   // basis points rolled at borrow time; interest accrues lazily off debtSince.
@@ -503,3 +509,67 @@ export const casinoConfig = pgTable("casino_config", {
   statsSince: timestamp("stats_since", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ---------- admin ----------
+
+// Immutable audit log — one row per admin action (money moves, moderation,
+// config changes, user edits). Rows are never updated or deleted by the app;
+// the UI only reads them. `before`/`after` JSON snapshots keep the action
+// reviewable; `reason` is the admin-acknowledged justification text.
+export const adminAudit = pgTable(
+  "admin_audit",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    adminId: text("admin_id").notNull(), // acting admin (no FK: survives user deletion)
+    adminName: text("admin_name").notNull().default(""), // username snapshot at action time
+    action: text("action").notNull(), // e.g. "money.grant", "user.ban", "market.resolve"
+    targetType: text("target_type").notNull().default(""), // "user" | "market" | "ledger" | "config" | …
+    targetId: text("target_id").notNull().default(""),
+    before: jsonb("before"),
+    after: jsonb("after"),
+    reason: text("reason").notNull().default(""), // required for money + destructive actions
+    ip: text("ip").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("admin_audit_created_idx").on(t.createdAt),
+    index("admin_audit_admin_idx").on(t.adminId, t.createdAt),
+    index("admin_audit_action_idx").on(t.action, t.createdAt),
+    index("admin_audit_target_idx").on(t.targetType, t.targetId),
+  ]
+);
+
+// Moderation reports — reported content (comments, markets, photos, users)
+// waits in the queue until a moderator resolves or dismisses it.
+export const report = pgTable(
+  "report",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    kind: text("kind").notNull(), // comment | market | photo | user | duel
+    targetId: text("target_id").notNull(),
+    reporterId: text("reporter_id").references(() => user.id, { onDelete: "set null" }),
+    reason: text("reason").notNull().default(""),
+    status: text("status").notNull().default("open"), // open | resolved | dismissed
+    assigneeId: text("assignee_id"), // moderator who took the case (no FK: resilient)
+    resolutionNote: text("resolution_note").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  },
+  (t) => [index("report_status_idx").on(t.status, t.createdAt)]
+);
+
+// Economy/platform config snapshots — every settings save stores the full
+// knob set as a version with author, note and timestamp; UI can diff and roll
+// back. The live config still lives in casino_config (single source).
+export const configVersion = pgTable("config_version", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  data: jsonb("data").notNull(), // full knob map at save time
+  changedBy: text("changed_by").notNull(),
+  changedByName: text("changed_by_name").notNull().default(""),
+  note: text("note").notNull().default(""),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Player restriction columns live on the user table above (Phase 1 groundwork
+// for money freeze + kid mode): frozenAt freezes balance ops; kidMode shrinks
+// limits; maxStakeCents overrides the platform stake cap for that player.

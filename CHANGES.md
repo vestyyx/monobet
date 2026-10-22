@@ -2,6 +2,14 @@
 
 This fork of **MonoBet** (upstream: https://github.com/Dvorinka/monobet) is being reworked into **MonoPredict** — a private, family-and-friends forecasting game. Sunčný, family-friendly, no gambling. Mony (Ɱ) are play points with no monetary value.
 
+## Phase 2 — admin panel rebuild (in progress)
+
+### 2.1 Architecture + module registry (committed)
+- `lib/admin/rbac.ts` — role ladder **user → moderator → admin → owner** (super-admin email = owner), `requireRole`/`assertRole` as the single server-side gate for every admin endpoint.
+- `lib/admin/modules.ts` — **module registry**: markets, gigs, all planned family games, money, groups, moderation, approvals, economy, settings, audit-log — each with CZ/EN labels, icon, minimum role and delivery phase. Sidebar, dashboard quick links and section routing generate from it (adding/flagging a module updates the whole panel).
+- New tables (migration `0051_phase2-admin-core.sql`): `admin_audit` (immutable log), `report` (moderation queue), `config_version` (settings snapshots); `user` gains `frozen_at` / `kid_mode` / `max_stake_cents`.
+- New shell: registry-driven sidebar (responsive, tablet-friendly), **live dashboard** `/admin` (active today, supply, trades/gigs/duels today, pending approvals, reports, recent money movement, warnings) and `/admin/[section]` stubs for not-yet-built modules. The original stacked panels remain at `/admin/overview` until phases 3–6 migrate them.
+
 ## Phase 1 — de-gambling surgery + friendly rebrand (committed)
 
 ### Removed entirely — the casino

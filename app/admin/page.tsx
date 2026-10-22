@@ -1,159 +1,114 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
-import type { Metadata } from "next";
-import { getCurrentUser, isAdmin } from "@/lib/session";
-import { getPendingMarkets, listMarkets, getAllUsers, listCategories, listCategoryRows, getDisputedDuels, getNoteCounts, getHouseStats } from "@/lib/queries";
-import { PendingList, LiveMarketList, GrantPanel, CategoriesPanel, UsersPanel, UserManager, DuelAdminPanel, HousePanel } from "@/components/admin-panels";
-import { MarketForm } from "@/components/market-form";
+import { requireRole } from "@/lib/admin/rbac";
+import { getAdminDashboard } from "@/lib/admin/dashboard";
 import { getLang } from "@/lib/lang-server";
 import { getT } from "@/lib/i18n";
-import { Card } from "@/components/ui/primitives";
-import { ShieldCheck, Inbox, Radio, Users, PlusCircle, Tags, UserPlus, Swords, Landmark } from "lucide-react";
+import { Card, Badge } from "@/components/ui/primitives";
+import { fmtMonos, fmtDateTime } from "@/lib/money";
+import { ShieldCheck, Activity, Users, Wallet, Sprout, Zap, Swords, Inbox, ShieldAlert, ArrowRight } from "lucide-react";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Administrace" };
+export const metadata = { title: "Administrace" };
 
-export default async function AdminPage() {
-  const [user, lang] = await Promise.all([getCurrentUser(), getLang()]);
+// Admin dashboard — the "what's happening right now" home. Deep tooling lives
+// in the registry-driven sections (sidebar); this page keeps an eye on the
+// platform's pulse and surfaces warnings.
+export default async function AdminDashboard() {
+  const user = await requireRole("moderator");
   if (!user) redirect("/login");
-  if (!isAdmin(user)) redirect("/");
+  const [lang] = await Promise.all([getLang()]);
   const t = getT(lang);
+  const d = await getAdminDashboard();
+  void user.parsedRole;
 
-  const [pending, live, users, categories, categoryRows, disputed, house, noteCounts] = await Promise.all([
-    getPendingMarkets(),
-    listMarkets({ includeOptions: true }),
-    getAllUsers(),
-    listCategories(),
-    listCategoryRows(),
-    getDisputedDuels(),
-    getHouseStats(),
-  ]).then(async (r) => {
-    // Note counts need the market ids first — one extra batched query.
-    const counts = await getNoteCounts((r[1] as { id: string }[]).map((m) => m.id));
-    return [...r, counts] as const;
-  });
+  const stats = [
+    { icon: <Activity className="size-4" />, label: t.admActiveToday, value: String(d.activeToday) },
+    { icon: <Users className="size-4" />, label: t.admPlayers, value: String(d.players) },
+    { icon: <Wallet className="size-4" />, label: t.admSupply, value: fmtMonos(d.supplyCents, { lang }) },
+    { icon: <Zap className="size-4" />, label: t.admTradesToday, value: String(d.tradesToday) },
+    { icon: <Sprout className="size-4" />, label: t.admJobsToday, value: String(d.jobsToday) },
+    { icon: <Swords className="size-4" />, label: t.admDuelsToday, value: String(d.duelsToday) },
+    { icon: <Inbox className="size-4" />, label: t.admPending, value: String(d.pendingMarkets), warn: d.pendingMarkets > 0 },
+    { icon: <ShieldAlert className="size-4" />, label: t.admReports, value: String(d.reportsOpen), warn: d.reportsOpen > 0 },
+  ];
 
   return (
-    <div className="mx-auto max-w-5xl px-4 pt-8">
+    <div className="py-2">
       <h1 className="text-[22px] font-bold tracking-tight flex items-center gap-2">
         <ShieldCheck className="size-5" /> {t.adminTitle}
       </h1>
+      <p className="mt-1 text-[13px] text-mute">{t.admDashIntro}</p>
 
-      {/* [&>*]:min-w-0 — grid items default to min-width:auto, so any nowrap
-          text inside (long emails, market titles) would stretch the implicit
-          mobile column past the viewport. */}
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2 [&>*]:min-w-0">
-        <section className="lg:col-span-2">
-          <SectionTitle icon={<Inbox className="size-4" />} title={t.pendingProposals(pending.length)} />
-          <Card className="overflow-hidden">
-            <PendingList
-              lang={lang}
-              items={pending.map(({ market: m, username }) => ({
-                id: m.id,
-                slug: m.slug,
-                question: m.question,
-                category: m.category,
-                createdAt: m.createdAt,
-                username,
-              }))}
-            />
+      {/* Warnings row — only renders when something needs eyes. */}
+      {(d.pendingMarkets > 0 || d.disputedDuels > 0 || d.reportsOpen > 0) && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {d.pendingMarkets > 0 && (
+            <Link href="/admin/overview">
+              <Badge tone="warn" className="cursor-pointer">{t.admWarnPending(d.pendingMarkets)}</Badge>
+            </Link>
+          )}
+          {d.disputedDuels > 0 && (
+            <Link href="/admin/overview">
+              <Badge tone="warn" className="cursor-pointer">{t.admWarnDisputes(d.disputedDuels)}</Badge>
+            </Link>
+          )}
+          {d.reportsOpen > 0 && (
+            <Badge tone="no">{t.admWarnReports(d.reportsOpen)}</Badge>
+          )}
+        </div>
+      )}
+
+      {/* Stat grid — min-w-0 keeps long money values from overflowing phone widths. */}
+      <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 [&>*]:min-w-0">
+        {stats.map((s) => (
+          <Card key={s.label} className="px-3 py-2.5">
+            <div className="flex items-center gap-1.5 text-faint">
+              {s.icon}
+              <span className="text-[10.5px] font-semibold uppercase tracking-wider truncate">{s.label}</span>
+            </div>
+            <div className={`num text-[18px] font-bold mt-1 ${s.warn ? "text-warn-strong" : "text-ink"}`}>{s.value}</div>
           </Card>
-        </section>
+        ))}
+      </div>
 
-        <section className="lg:col-span-2">
-          <SectionTitle icon={<Landmark className="size-4" />} title={t.houseTitle} />
-          <Card className="overflow-hidden">
-            <HousePanel lang={lang} stats={house} />
-          </Card>
-        </section>
-
-        <section className="lg:col-span-2">
-          <SectionTitle icon={<Users className="size-4" />} title={t.umTitle} />
-          <Card className="overflow-hidden">
-            <UserManager users={users} selfId={user.id} lang={lang} />
-          </Card>
-        </section>
-
-        {disputed.length > 0 && (
-          <section className="lg:col-span-2">
-            <SectionTitle icon={<Swords className="size-4" />} title={t.duelDisputes(disputed.length)} />
-            <Card className="overflow-hidden">
-              <DuelAdminPanel
-                lang={lang}
-                items={disputed.map(({ duel: d, creatorName, opponentName }) => ({
-                  id: d.id,
-                  claim: d.claim,
-                  stakeCents: d.stakeCents,
-                  creatorId: d.creatorId,
-                  opponentId: d.opponentId,
-                  creatorName,
-                  opponentName,
-                }))}
-              />
-            </Card>
-          </section>
+      {/* Recent money movement — the fastest way to spot anything odd. */}
+      <h2 className="text-[14px] font-semibold mb-2.5 mt-7 flex items-center gap-1.5 text-ink-2">
+        <Wallet className="size-4" /> {t.admRecentLedger}
+      </h2>
+      <Card className="overflow-hidden">
+        {d.recentLedger.length === 0 ? (
+          <p className="p-4 text-sm text-mute">{t.admNoLedger}</p>
+        ) : (
+          <div className="divide-y divide-line-2">
+            {d.recentLedger.map((r) => (
+              <div key={r.id} className="px-4 py-2.5 flex items-center gap-3 min-w-0">
+                <span className={`num text-[12.5px] font-bold shrink-0 ${r.amountCents >= 0 ? "text-yes-strong" : "text-no-strong"}`}>
+                  {r.amountCents >= 0 ? "+" : "−"}{fmtMonos(Math.abs(r.amountCents), { lang })}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[12.5px] truncate">{r.memo || r.kind}</div>
+                  <div className="text-[11px] text-faint truncate">
+                    {r.username ? `@${r.username}` : "—"} · {fmtDateTime(r.createdAt, lang)} · {r.kind}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
+      </Card>
 
-        <section className="lg:col-span-2">
-          <SectionTitle icon={<Radio className="size-4" />} title={t.liveMarkets(live.filter((m) => !m.parentId).length)} />
-          <Card className="overflow-hidden">
-            <LiveMarketList
-              lang={lang}
-              items={live.map((m) => ({
-                id: m.id,
-                slug: m.slug,
-                question: m.question,
-                label: m.label,
-                parentId: m.parentId,
-                category: m.category,
-                volumeCents: m.volumeCents,
-                traderCount: m.traderCount,
-                closesAt: m.closesAt,
-                kind: m.kind,
-                noteCount: noteCounts.get(m.id) ?? 0,
-                proposedOutcome: m.proposedOutcome,
-                status: m.status,
-              }))}
-            />
-          </Card>
-        </section>
-
-        {/* Tool panels — the tall market form anchors the left column while the
-            three compact panels stack beside it. */}
-        <section className="lg:row-span-3">
-          <SectionTitle icon={<PlusCircle className="size-4" />} title={t.createMarketTitle} />
-          <MarketForm isAdmin categories={categories} lang={lang} />
-        </section>
-
-        <section>
-          <SectionTitle icon={<Tags className="size-4" />} title={t.categoriesTitle} />
-          <Card>
-            <CategoriesPanel categories={categoryRows} lang={lang} />
-          </Card>
-        </section>
-
-        <section>
-          <SectionTitle icon={<Users className="size-4" />} title={t.grantBalance} />
-          <Card>
-            <GrantPanel users={users.map((u) => ({ id: u.id, username: u.username, balanceCents: u.balanceCents }))} lang={lang} />
-          </Card>
-        </section>
-
-        <section>
-          <SectionTitle icon={<UserPlus className="size-4" />} title={t.umCreateUser} />
-          <Card>
-            <UsersPanel lang={lang} />
-          </Card>
-        </section>
+      {/* Deep sections arrive phase by phase; the legacy stacked page keeps
+          every existing tool reachable until each is migrated. */}
+      <div className="mt-7 rounded-xl border border-line bg-surface-2 px-4 py-3.5 flex items-center gap-3 flex-wrap">
+        <div className="flex-1 min-w-64">
+          <div className="text-[13px] font-semibold">{t.admLegacyTitle}</div>
+          <p className="text-[12px] text-mute mt-0.5">{t.admLegacyNote}</p>
+        </div>
+        <Link href="/admin/overview" className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-[12.5px] font-semibold text-brand-on hover:bg-brand-strong transition-colors">
+          {t.admLegacyOpen} <ArrowRight className="size-3.5" />
+        </Link>
       </div>
     </div>
-  );
-}
-
-function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string }) {
-  return (
-    <h2 className="text-[14px] font-semibold mb-2.5 flex items-center gap-1.5 text-ink-2">
-      {icon}
-      {title}
-    </h2>
   );
 }
