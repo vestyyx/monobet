@@ -26,7 +26,7 @@
 | 1 | De-gambling surgery + MonoPredict rebrand | ✅ done | `85e19ff` |
 | 2.1 | Admin architecture + module registry + new shell | ✅ done | `8cfeca2` |
 | G1 | Games batch 1: Daily Trivia + Closest Guess | ✅ done | `3600a0b`, `8c36ec2` |
-| G2 | Games batch 2: Group Polls + Word/Emoji Guess | ⏳ next batch | — |
+| G2 | Games batch 2: Group Polls + Word/Emoji Guess | ✅ done | `54924ab` (PR #4) |
 | G3 | Games batch 3: Family Quests + Photo Guess | ⬜ queued | — |
 | 2.2 | Player money management + ledger-backed actions + audit log | ⬜ approved-in-principle | — |
 | 3 | Users, groups, approvals queue | ⬜ queued | — |
@@ -71,12 +71,14 @@
 
 ---
 
-## ⏳ Next: games batches 2 & 3 (each = schema + actions + UI + admin + i18n + commit)
+## ✅ Done: games batch 2 (PR #4, `1e2e6c7`, live)
 
 ### Games batch 2 — Group Polls + Word/Emoji Guess
-- [ ] `poll` (+ `poll_vote`): weekly group poll, funny **minority-wins** mechanic — losing majority earns nothing, minority side splits/gets fixed Ɱ; lazy close; per-group scoping when groups arrive
-- [ ] `emoji` (+ `emoji_solve`): emoji riddles ("🍕🌧️"), 3 attempts per player, first correct solver takes the prize, hint after time passes
-- [ ] Admin creators for both; registry `built: true`; player pages + `/games` cards un-stubbed
+- [x] `poll_round` + `poll_vote`: two-option family poll, **minority wins in full** (tie crowns both, empty pays nobody); one vote per player, switchable while open; settle = locked transaction paying per vote + audit with the tally
+- [x] `emoji_round` + `emoji_attempt`: emoji riddles, 3 attempts, first correct solver takes the Ɱ150 — enforced by partial unique index `emoji_first_solver_idx`; nudge unlocks at 60 % of the round; answers never ship to the client; expired rounds auto-close lazily
+- [x] Admin creators `/admin/polls` + `/admin/word-guess`; registry `built: true`; `/poll` + `/emoji` live; `/games` hub at 4 cards; demo seed extended
+
+## ⏳ Next: games batch 3 (schema + actions + UI + admin + i18n + commit)
 
 ### Games batch 3 — Family Quests + Photo Guess
 - [ ] `quest` (+ `quest_claim`): real-life tasks with text/photo proof → parent/admin approval → ledger payout
