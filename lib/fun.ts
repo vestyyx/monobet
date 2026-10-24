@@ -69,3 +69,56 @@ export function guessClampValue(value: number): number {
   if (!Number.isFinite(v)) return 0;
   return Math.max(-1_000_000_000, Math.min(1_000_000_000, v));
 }
+
+// ---------- group polls ----------
+// Default minority-wins prize per voter (Ɱ100); the majority side earns only
+// the consolation token when the admin turns it on (often off — the joke IS
+// being in the losing crowd).
+export const POLL_REWARD_CENTS = 10_000;
+
+// Minority-wins logic. Given per-side vote counts, the smaller side wins.
+// A tie (equal nonzero counts) means BOTH sides win in full — friendlier than
+// splitting hairs. No votes at all → nobody wins.
+// Returns 'a' | 'b' | 'both' | null.
+export function pollMinoritySide(countA: number, countB: number): "a" | "b" | "both" | null {
+  if (countA < countB) return "a";
+  if (countB < countA) return "b";
+  return countA > 0 ? "both" : null;
+}
+
+// ---------- word/emoji riddles ----------
+export const EMOJI_MAX_ATTEMPTS = 3;
+// Default prize for the first solver (Ɱ150).
+export const EMOJI_REWARD_CENTS = 15_000;
+
+// Attempts a player has left (never negative — 0 means locked out).
+export function emojiAttemptsLeft(used: number): number {
+  return Math.max(0, EMOJI_MAX_ATTEMPTS - Math.max(0, used));
+}
+
+// Normalized comparison for typed answers: case-, diacritic-, punctuation-
+// and whitespace-insensitive. "PapancÍ s  jablky!!!" and "papancí s jablky"
+// must count as the same recipe. NFD + strip combining marks handles
+// Czech/English accents; everything non-alphanumeric is dropped.
+export function emojiNormalize(s: string): string {
+  return (s ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "")
+    .trim();
+}
+
+// Whether a typed guess solves a round: matches either the CZ or the EN
+// answer after normalization.
+export function emojiSolves(guess: string, answerCs: string, answerEn: string): boolean {
+  const g = emojiNormalize(guess);
+  return g.length > 0 && (g === emojiNormalize(answerCs) || g === emojiNormalize(answerEn));
+}
+
+// Shared clock helper for poll/emoji rounds (impure Date.now() read stays out
+// of component render scope — see guessRoundOpen).
+export function funRoundOpen(status: string, closeAt: string | number | Date): boolean {
+  if (status !== "open") return false;
+  return new Date(closeAt).getTime() > Date.now();
+}

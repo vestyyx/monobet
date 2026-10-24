@@ -2,6 +2,15 @@
 
 This fork of **MonoBet** (upstream: https://github.com/Dvorinka/monobet) is being reworked into **MonoPredict** — a private, family-and-friends forecasting game. Sunčný, family-friendly, no gambling. Mony (Ɱ) are play points with no monetary value.
 
+## Games batch 2 — Group Polls + Word/Emoji Riddles (committed)
+- New schema (migration `0053_fun-games-batch2.sql`): `poll_round` (two-option family question, minority wins) + `poll_vote` (one vote per player, switchable while open, unique index), `emoji_round` (bilingual answer + optional nudge, hint unlocks at 60 % of the round) + `emoji_attempt`. "First solver wins" is a database guarantee — a **partial unique index** (`emoji_first_solver_idx`, one `correct` row per round) makes the race for the prize airtight; the loser of the race gets a friendly "someone was a hair faster".
+- `lib/fun.ts` + tests: `pollMinoritySide` (smaller side wins in full, a tie crowns BOTH sides, empty poll pays nobody), `emojiSolves`/`emojiNormalize` (answers compare case-, diacritic-, punctuation- and whitespace-insensitively — "PAPANČE with jam!!!" counts), `emojiAttemptsLeft` (3 attempts), `funRoundOpen`, rewards `Ɱ100` per minority voter, `Ɱ150` first solver. 54 tests passing.
+- `lib/actions-fun.ts`: `pollList/pollVoteRound/pollSettle` (locked settle transaction pays per vote + audit `game.pollSettle` with the tally), `emojiList/emojiGuess/emojiReveal` — answers never leave the server while a riddle is open; expired unsolved riddles settle lazily on the next list read (`revealedBy:"auto"`); admin creators `adminFunCreatePoll` / `adminFunCreateEmojiRound` (role-gated, audited).
+- Player pages `/poll` (vote, switch sides until close, live tallies, winners line) and `/emoji` (three guesses, nudge block, first-solver name) + `/games` hub now shows 4 live cards.
+- Admin: `/admin/polls` and `/admin/word-guess` (creators + round lists incl. vote/guess counts via grouped side queries, close-and-pay / reveal buttons), registry modules `polls` + `word-guess` flipped to `built: true`.
+- Demo seed `scripts/seed-fun.ts` extended (open family poll ×2, one open emoji riddle) + new inspectors `scripts/check-fun.ts` / `scripts/check-users.ts`.
+- E2E on the dev instance: vote A↔B switching, minority/tie settle paying both sides Ɱ100 each, first-solver race (wrong guess burns an attempt, correct guess settles the round and pays Ɱ150), admin create + reveal with `game.*` audit rows.
+
 ## Shipping — CI, roadmap, production deploy (merged via PR #3)
 - **`ROADMAP.md`** added at repo root: single tracker for the whole rebuild (milestones table, done details, games batches 2–3, admin phases 2–7 spec, architecture decisions, file map, env/ops, working rules).
 - **`.github/workflows/ci.yml`**: typecheck + lint + vitest on every push/PR (Node 22). From now on PRs must be green before merging.

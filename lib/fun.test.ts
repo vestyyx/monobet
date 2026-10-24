@@ -5,6 +5,10 @@ import {
   guessWithinWindow,
   guessDistance,
   guessClampValue,
+  pollMinoritySide,
+  emojiSolves,
+  emojiNormalize,
+  emojiAttemptsLeft,
 } from "./fun";
 
 describe("funStreakMultiplier", () => {
@@ -59,5 +63,42 @@ describe("closest guess helpers", () => {
     expect(guessClampValue(1e12)).toBe(1_000_000_000);
     expect(guessClampValue(12.4)).toBe(12);
     expect(guessClampValue(Number.NaN)).toBe(0);
+  });
+});
+
+describe("poll minority-wins", () => {
+  it("the smaller side takes it in full", () => {
+    expect(pollMinoritySide(4, 2)).toBe("b");
+    expect(pollMinoritySide(1, 7)).toBe("a");
+  });
+
+  it("a tie means both sides win", () => {
+    expect(pollMinoritySide(3, 3)).toBe("both");
+  });
+
+  it("an empty poll pays nobody", () => {
+    expect(pollMinoritySide(0, 0)).toBeNull();
+  });
+});
+
+describe("emoji answer matching", () => {
+  it("normalization ignores case, diacritics and punctuation", () => {
+    expect(emojiNormalize("Papancí!!")).toBe("papanci");
+    expect(emojiNormalize("  Gr-r-yl, Mami ")).toBe("grrylmami");
+    expect(emojiNormalize("ŠUPÁK-Šupák")).toBe("supaksupak");
+  });
+
+  it("a guess solves if it matches the CZ or EN answer", () => {
+    expect(emojiSolves("PAPANČE s marmeládou", "papanče s marmeládou", "pancakes with jam")).toBe(true);
+    expect(emojiSolves("PANCAKES WITH JAM", "papanče s marmeládou", "pancakes with jam")).toBe(true);
+    expect(emojiSolves("synové babičky", "dcera babičky", "grandma's daughter")).toBe(false);
+    expect(emojiSolves("", "x", "y")).toBe(false); // empty guesses never solve
+  });
+
+  it("attempts left never goes negative", () => {
+    expect(emojiAttemptsLeft(0)).toBe(3);
+    expect(emojiAttemptsLeft(2)).toBe(1);
+    expect(emojiAttemptsLeft(3)).toBe(0);
+    expect(emojiAttemptsLeft(99)).toBe(0);
   });
 });
