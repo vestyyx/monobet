@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { Brain, Target, Sparkles, PartyPopper, ArrowRight } from "lucide-react";
+import { Brain, Target, Sparkles, PartyPopper, ArrowRight, MessageCircleQuestion } from "lucide-react";
 import { getCurrentUser, isAdmin } from "@/lib/session";
 import { getLang } from "@/lib/lang-server";
 import { getT } from "@/lib/i18n";
@@ -13,8 +13,8 @@ export const metadata: Metadata = { title: "Herní koutek" };
 
 // The family games corner — free-play party games with small fixed Mony
 // prizes. Built games link live; the rest are honest "coming soon" cards
-// (registry-aligned: trivia & closest-guess land first, then polls, emoji,
-// quests, photo).
+// (registry-aligned: trivia, guess, polls and emoji riddles live; quests and
+// photo guess land next).
 export default async function GamesPage() {
   const [user, lang] = await Promise.all([getCurrentUser(), getLang()]);
   if (!user) redirect("/login");
@@ -32,6 +32,18 @@ export default async function GamesPage() {
       Icon: Target,
       title: t.gamesGuessTitle,
       desc: t.gamesGuessDesc,
+    },
+    {
+      href: "/poll",
+      Icon: Sparkles,
+      title: t.gamesPollTitle,
+      desc: t.gamesPollDesc,
+    },
+    {
+      href: "/emoji",
+      Icon: MessageCircleQuestion,
+      title: t.gamesEmojiTitle,
+      desc: t.gamesEmojiDesc,
     },
   ];
 
@@ -76,7 +88,7 @@ export default async function GamesPage() {
         <Card className="p-5 sm:col-span-2 border-dashed">
           <div className="flex items-start gap-3">
             <span className="rounded-xl bg-surface-2 text-mute p-2.5">
-              <Sparkles className="size-5" />
+              <PartyPopper className="size-5" />
             </span>
             <div className="min-w-0">
               <div className="flex items-center gap-2">

@@ -17,9 +17,15 @@ import {
   guessClampValue,
   guessDistance,
   guessWithinWindow,
+  pollMinoritySide,
+  emojiSolves,
+  emojiAttemptsLeft,
+  funRoundOpen,
   GUESS_REWARD_CENTS,
   GUESS_CONSOLATION_CENTS,
   TRIVIA_REWARD_BY_DIFFICULTY,
+  POLL_REWARD_CENTS,
+  EMOJI_REWARD_CENTS,
 } from "@/lib/fun";
 
 // ---------- audit (shared by every admin action across the panel) ----------
@@ -434,3 +440,368 @@ export async function adminFunCreateGuessRound(input: {
 }
 
 // Re-export nothing — bottom of file kept clean on purpose.
+
+// ---------- Group polls (minority wins) ----------
+
+export type PollView = {
+  id: string;
+  q: string;
+  a: string;
+  b: string;
+  closeAt: Date;
+  status: "open" | "settled";
+  mySide: "a" | "b" | null;
+  countA: number;
+  countB: number;
+  winningSide: "a" | "b" | "both" | null; // settled rounds only
+  myRewardCents: number | null;
+  rewardCents: number;
+  consolationCents: number;
+};
+
+// Open + recently settled polls, newest first. Re-voting is allowed while a
+// poll is open (switch sides freely — the crowd will outsmart itself).
+export async function pollList(limit = 12): Promise<PollView[]> {
+  const lang: Lang = await getLang();
+  const u = await requireUser();
+
+  const rounds = await db.select().from(schema.pollRound).orderBy(desc(schema.pollRound.createdAt)).limit(limit);
+  const ids = rounds.map((r) => r.id);
+  const votes = ids.length
+    ? await db
+        .select({ pollId: schema.pollVote.pollId, userId: schema.pollVote.userId, side: schema.pollVote.side, rewardCents: schema.pollVote.rewardCents })
+        .from(schema.pollVote)
+        .where(sql`${schema.pollVote.pollId} in (${sql.join(ids.map((i) => sql`${i}`), sql`, `)})`)
+    : [];
+
+  return rounds.map((r) => {
+    const mine = votes.find((v) => v.pollId === r.id && v.userId === u.id);
+    const countA = votes.filter((v) => v.pollId === r.id && v.side === "a").length;
+    const countB = votes.filter((v) => v.pollId === r.id && v.side === "b").length;
+    return {
+      id: r.id,
+      q: lang === "cs" ? r.qCs : r.qEn,
+      a: lang === "cs" ? r.aCs : r.aEn,
+      b: lang === "cs" ? r.bCs : r.bEn,
+      closeAt: r.closeAt,
+      status: (r.status as "open" | "settled") ?? "open",
+      mySide: (mine?.side as "a" | "b" | undefined) ?? null,
+      countA,
+      countB,
+      winningSide: r.status === "settled" ? ((r.winningSide as "a" | "b" | "both" | null) ?? null) : null,
+      myRewardCents: mine?.rewardCents ?? null,
+      rewardCents: r.rewardCents,
+      consolationCents: r.consolationCents,
+    };
+  });
+}
+
+// Vote (or switch sides). One vote per player per poll via the unique index.
+export async function pollVoteRound(pollId: string, side: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const u = await requireUser();
+    if (u.frozenAt) throw new Error("Account frozen");
+    if (side !== "a" && side !== "b") throw new Error("Pick a side");
+
+    await db.transaction(async (tx) => {
+      const [r] = await tx.select().from(schema.pollRound).where(eq(schema.pollRound.id, pollId)).for("update").limit(1);
+      if (!r) throw new Error("Poll not found");
+      if (!funRoundOpen(r.status, r.closeAt)) throw new Error("This poll is closed");
+
+      const [existing] = await tx
+        .select()
+        .from(schema.pollVote)
+        .where(and(eq(schema.pollVote.pollId, r.id), eq(schema.pollVote.userId, u.id)))
+        .for("update")
+        .limit(1);
+      if (existing) {
+        if (existing.side === side) return; // same side — nothing to do
+        await tx.update(schema.pollVote).set({ side }).where(eq(schema.pollVote.id, existing.id));
+      } else {
+        await tx.insert(schema.pollVote).values({ pollId: r.id, userId: u.id, side });
+      }
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Could not save your vote" };
+  }
+}
+
+// Settle a poll: the minority side wins in full (a tie crowns BOTH sides).
+// Majority voters get the consolation token only when the admin enabled one
+// (default Ɱ0 — the joke of being in the big crowd is the consolation).
+export async function pollSettle(pollId: string): Promise<{ ok: boolean; error?: string; paid?: number }> {
+  try {
+    const admin = await assertRole("moderator");
+    let paid = 0;
+    await db.transaction(async (tx) => {
+      const [r] = await tx.select().from(schema.pollRound).where(eq(schema.pollRound.id, pollId)).for("update").limit(1);
+      if (!r) throw new Error("Poll not found");
+      if (r.status === "settled") throw new Error("Already settled");
+
+      const votes = await tx.select().from(schema.pollVote).where(eq(schema.pollVote.pollId, r.id)).for("update");
+      const countA = votes.filter((v) => v.side === "a").length;
+      const countB = votes.filter((v) => v.side === "b").length;
+      const winner = pollMinoritySide(countA, countB);
+
+      const winReward = r.rewardCents > 0 ? r.rewardCents : POLL_REWARD_CENTS;
+      const consReward = Math.max(0, r.consolationCents);
+
+      await tx.update(schema.pollRound).set({ status: "settled", winningSide: winner, settledBy: admin.id }).where(eq(schema.pollRound.id, r.id));
+
+      for (const v of votes) {
+        const onWinningSide = winner === "both" || winner === v.side;
+        const amt = onWinningSide ? winReward : consReward;
+        if (amt <= 0) continue;
+        await lockUser(tx, v.userId);
+        await credit(tx, v.userId, amt, "poll", null, onWinningSide ? "Family poll — the clever minority" : "Family poll — standing with the crowd");
+        await tx.update(schema.pollVote).set({ rewardCents: amt }).where(eq(schema.pollVote.id, v.id));
+        paid += amt;
+      }
+
+      await audit(tx, admin.id, admin.username ?? "admin", "game.pollSettle", "poll_round", r.id, `A: ${countA}, B: ${countB} → ${winner ?? "nobody"}`);
+    });
+    return { ok: true, paid };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Settle failed" };
+  }
+}
+
+// ---------- Word/emoji riddles ----------
+
+export type EmojiView = {
+  id: string;
+  emoji: string;
+  closeAt: Date;
+  status: "open" | "settled";
+  hint: string | null; // visible once the clock passes hintAt (or after settle)
+  hintUnlocked: boolean;
+  myAttempts: number;
+  attemptsLeft: number;
+  myGuesses: string[];
+  solved: boolean; // by anyone (round settles on solve)
+  solvedByMe: boolean;
+  winnerUsername: string | null;
+  answer: string | null; // revealed only after settle
+  rewardCents: number;
+};
+
+export async function emojiList(limit = 12): Promise<EmojiView[]> {
+  const lang: Lang = await getLang();
+  const u = await requireUser();
+
+  const rounds = await db.select().from(schema.emojiRound).orderBy(desc(schema.emojiRound.createdAt)).limit(limit);
+
+  // Lazy close: expired-but-unclaimed rounds settle silently — the riddle is
+  // over, reveal the answer; nobody pays anything. Safe to repeat (status
+  // guard + row lock) and keeps the list honest without an admin visit.
+  const expired = rounds.filter((r) => r.status === "open" && !funRoundOpen(r.status, r.closeAt));
+  for (const r of expired) {
+    await db.transaction(async (tx) => {
+      const [row] = await tx.select().from(schema.emojiRound).where(eq(schema.emojiRound.id, r.id)).for("update").limit(1);
+      if (!row || row.status !== "open" || funRoundOpen(row.status, row.closeAt)) return;
+      await tx.update(schema.emojiRound).set({ status: "settled", revealedBy: "auto" }).where(eq(schema.emojiRound.id, row.id));
+      await audit(tx, "auto", "auto", "game.emojiAutoClose", "emoji_round", row.id, "No solver before close");
+    });
+  }
+
+  const ids = rounds.map((r) => r.id);
+  const attempts = ids.length
+    ? await db
+        .select({ roundId: schema.emojiAttempt.roundId, userId: schema.emojiAttempt.userId, guess: schema.emojiAttempt.guess, correct: schema.emojiAttempt.correct })
+        .from(schema.emojiAttempt)
+        .where(sql`${schema.emojiAttempt.roundId} in (${sql.join(ids.map((i) => sql`${i}`), sql`, `)})`)
+    : [];
+  const winnerNames = new Map<string, string>();
+  const winners = rounds.filter((r) => r.winnerUserId);
+  if (winners.length) {
+    const wrows = await db
+      .select({ id: schema.user.id, username: schema.user.username })
+      .from(schema.user)
+      .where(sql`${schema.user.id} in (${sql.join(winners.map((w) => sql`${w.winnerUserId!}`), sql`, `)})`);
+    for (const w of wrows) winnerNames.set(w.id, w.username ?? "?");
+  }
+
+  return rounds.map((r) => {
+    const settled = r.status === "settled";
+    const mine = attempts.filter((a) => a.roundId === r.id && a.userId === u.id);
+    const hintUnlocked = settled || new Date(r.hintAt).getTime() <= Date.now();
+    return {
+      id: r.id,
+      emoji: r.emoji,
+      closeAt: r.closeAt,
+      status: (r.status as "open" | "settled") ?? "open",
+      hint: hintUnlocked ? (lang === "cs" ? r.hintCs : r.hintEn) || null : null,
+      hintUnlocked,
+      myAttempts: mine.length,
+      attemptsLeft: emojiAttemptsLeft(mine.length),
+      myGuesses: mine.map((m) => m.guess),
+      solved: settled && r.winnerUserId != null,
+      solvedByMe: settled && r.winnerUserId === u.id,
+      winnerUsername: r.winnerUserId ? winnerNames.get(r.winnerUserId) ?? null : null,
+      answer: settled ? (lang === "cs" ? r.answerCs : r.answerEn) : null,
+      rewardCents: r.rewardCents,
+    };
+  });
+}
+
+// One guess. Attempts are capped; a correct guess settles the round on the
+// spot and pays the solver — the partial unique index guarantees exactly one
+// correct attempt row per round ("first solver wins" under any concurrency).
+export async function emojiGuess(roundId: string, guessRaw: string): Promise<{ ok: boolean; error?: string; correct?: boolean; attemptsLeft?: number }> {
+  try {
+    const u = await requireUser();
+    if (u.frozenAt) throw new Error("Account frozen");
+    const guess = (guessRaw ?? "").trim().slice(0, 120);
+    if (!guess) throw new Error("Type a guess");
+
+    let out: { ok: true; correct: boolean; attemptsLeft: number } = { ok: true, correct: false, attemptsLeft: 0 };
+    await db.transaction(async (tx) => {
+      const [r] = await tx.select().from(schema.emojiRound).where(eq(schema.emojiRound.id, roundId)).for("update").limit(1);
+      if (!r) throw new Error("Riddle not found");
+      if (!funRoundOpen(r.status, r.closeAt)) throw new Error("This riddle is closed");
+
+      const mine = await tx
+        .select()
+        .from(schema.emojiAttempt)
+        .where(and(eq(schema.emojiAttempt.roundId, r.id), eq(schema.emojiAttempt.userId, u.id)))
+        .for("update");
+      const left = emojiAttemptsLeft(mine.length);
+      if (left <= 0) throw new Error("Out of attempts — wait for the reveal");
+      const correct = emojiSolves(guess, r.answerCs, r.answerEn);
+
+      if (correct) {
+        // Insert kills itself on the partial unique index if another solver
+        // got here first → the friendly "already solved" error below.
+        await tx.insert(schema.emojiAttempt).values({ roundId: r.id, userId: u.id, guess, correct });
+        await tx
+          .update(schema.emojiRound)
+          .set({ status: "settled", winnerUserId: u.id, revealedBy: SOLVER_STAMP })
+          .where(eq(schema.emojiRound.id, r.id));
+        const reward = r.rewardCents > 0 ? r.rewardCents : EMOJI_REWARD_CENTS;
+        await credit(tx, u.id, reward, "emoji", null, "Emoji riddle — first solver!");
+        out = { ok: true, correct: true, attemptsLeft: emojiAttemptsLeft(mine.length + 1) };
+      } else {
+        await tx.insert(schema.emojiAttempt).values({ roundId: r.id, userId: u.id, guess, correct: false });
+        out = { ok: true, correct: false, attemptsLeft: left - 1 };
+      }
+    });
+    return out;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Could not record your guess";
+    // Concurrent duplicate solver: the first solver's insert won the index.
+    if (msg.includes("emoji_first_solver_idx") || msg.includes("duplicate key")) {
+      return { ok: false, error: "Someone was a hair faster — this riddle is solved" };
+    }
+    return { ok: false, error: msg };
+  }
+}
+
+// Admin reveal for a riddle nobody solved (or an early close): flips status
+// and shows the answer. No money moves.
+export async function emojiReveal(roundId: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const admin = await assertRole("moderator");
+    await db.transaction(async (tx) => {
+      const [r] = await tx.select().from(schema.emojiRound).where(eq(schema.emojiRound.id, roundId)).for("update").limit(1);
+      if (!r) throw new Error("Riddle not found");
+      if (r.status === "settled") throw new Error("Already settled");
+      await tx.update(schema.emojiRound).set({ status: "settled", revealedBy: admin.id }).where(eq(schema.emojiRound.id, r.id));
+      await audit(tx, admin.id, admin.username ?? "admin", "game.emojiReveal", "emoji_round", r.id, r.answerCs);
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Reveal failed" };
+  }
+}
+
+// The reveal stamp for a riddle solved by the first solver — no admin row.
+const SOLVER_STAMP = "solver";
+
+// ---------- batch 2 admin creators ----------
+
+export async function adminFunCreatePoll(input: {
+  qCs: string;
+  qEn: string;
+  aCs: string;
+  aEn: string;
+  bCs: string;
+  bEn: string;
+  closeInHours: number;
+  rewardMonos: number;
+  consolationMonos: number;
+}): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const admin = await assertRole("moderator");
+    const qCs = input.qCs?.trim();
+    const qEn = input.qEn?.trim();
+    const aCs = input.aCs?.trim();
+    const aEn = input.aEn?.trim();
+    const bCs = input.bCs?.trim();
+    const bEn = input.bEn?.trim();
+    if (!qCs || !qEn) throw new Error("Write the question in both languages");
+    if (!aCs || !aEn || !bCs || !bEn) throw new Error("Both options in both languages, please");
+    const hours = Math.max(1, Math.min(24 * 30, Math.round(Number(input.closeInHours) || 24 * 7)));
+    const reward = Math.max(0, Math.round((Number(input.rewardMonos) || 100) * 100));
+    const cons = Math.max(0, Math.round((Number(input.consolationMonos) || 0) * 100));
+
+    await db.transaction(async (tx) => {
+      await tx.insert(schema.pollRound).values({
+        qCs: qCs!,
+        qEn: qEn!,
+        aCs: aCs!,
+        aEn: aEn!,
+        bCs: bCs!,
+        bEn: bEn!,
+        closeAt: new Date(Date.now() + hours * 3_600_000),
+        rewardCents: reward,
+        consolationCents: cons,
+        createdBy: admin.id,
+      });
+      await audit(tx, admin.id, admin.username ?? "admin", "game.pollCreate", "poll_round", "", qCs ?? "");
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Could not create the poll" };
+  }
+}
+
+export async function adminFunCreateEmojiRound(input: {
+  emoji: string;
+  answerCs: string;
+  answerEn: string;
+  hintCs: string;
+  hintEn: string;
+  closeInHours: number;
+  rewardMonos: number;
+}): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const admin = await assertRole("moderator");
+    const emoji = input.emoji?.trim();
+    const answerCs = input.answerCs?.trim();
+    const answerEn = input.answerEn?.trim();
+    if (!emoji) throw new Error("Give the riddle its emoji");
+    if (!answerCs || !answerEn) throw new Error("Write the answer in both languages");
+    const hours = Math.max(1, Math.min(24 * 30, Math.round(Number(input.closeInHours) || 24)));
+    // The nudge unlocks at 60% of the round by default.
+    const hintAt = new Date(Date.now() + hours * 0.6 * 3_600_000);
+    const reward = Math.max(0, Math.round((Number(input.rewardMonos) || 150) * 100));
+
+    await db.transaction(async (tx) => {
+      await tx.insert(schema.emojiRound).values({
+        emoji: emoji!,
+        answerCs: answerCs!,
+        answerEn: answerEn!,
+        hintCs: input.hintCs?.trim() ?? "",
+        hintEn: input.hintEn?.trim() ?? "",
+        hintAt,
+        closeAt: new Date(Date.now() + hours * 3_600_000),
+        rewardCents: reward,
+      });
+      await audit(tx, admin.id, admin.username ?? "admin", "game.emojiCreate", "emoji_round", "", emoji ?? "");
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Could not create the riddle" };
+  }
+}

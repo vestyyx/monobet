@@ -227,11 +227,11 @@ export const ADMIN_MODULES: AdminModuleDef[] = [
     id: "word-guess",
     labelEn: "Word & emoji guess",
     labelCs: "Slovní hádanky",
-    descEn: "Word/emoji riddle rounds and their review queue.",
-    descCs: "Slovní a emoji hádanky a jejich schvalování.",
+    descEn: "Word/emoji riddle rounds and their reveal desk.",
+    descCs: "Slovní a emoji hádanky a jejich odhalování.",
     icon: MessageCircleQuestion,
     minRole: "admin",
-    built: false,
+    built: true, // live since family-games batch 2 — /admin/word-guess
     deliveryPhase: "Phase 4+ (family games)",
     group: "games",
   },
@@ -255,7 +255,7 @@ export const ADMIN_MODULES: AdminModuleDef[] = [
     descCs: "Týdenní hlasování skupin: tvorba, uzavření, výplaty.",
     icon: Sparkles,
     minRole: "admin",
-    built: false,
+    built: true, // live since family-games batch 2 — /admin/polls
     deliveryPhase: "Phase 4+ (family games)",
     group: "games",
   },

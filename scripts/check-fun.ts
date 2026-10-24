@@ -1,4 +1,4 @@
-// Dev check: last guess entries, fun-ledger rows, audit rows.
+// Dev check: poll rows + votes + recent fun-ledger + audit.
 import { Pool } from "pg";
 
 const pool = new Pool({
@@ -7,21 +7,21 @@ const pool = new Pool({
 });
 
 (async () => {
-  const e = await pool.query(
-    'select u.username, ge.value, ge.reward_cents from guess_entry ge left join "user" u on u.id = ge.user_id'
+  const p = await pool.query(
+    'select id, left(q_cs, 30) as q, status, winning_side, reward_cents from poll_round order by created_at desc'
   );
-  console.log("entries:", JSON.stringify(e.rows));
+  console.log("polls:", JSON.stringify(p.rows));
+  const v = await pool.query(
+    'select u.username, pv.side, pv.reward_cents from poll_vote pv left join "user" u on u.id = pv.user_id'
+  );
+  console.log("votes:", JSON.stringify(v.rows));
   const l = await pool.query(
-    "select kind, amount_cents, memo from ledger where kind in ('guess','trivia') order by created_at desc limit 3"
+    "select kind, amount_cents, memo from ledger where kind in ('poll','emoji') order by created_at desc limit 6"
   );
   console.log("ledger:", JSON.stringify(l.rows));
   const a = await pool.query(
-    "select action, target_type, reason from admin_audit order by created_at desc limit 3"
+    "select action, admin_name, reason from admin_audit where action like 'game.%' order by created_at desc limit 6"
   );
   console.log("audit:", JSON.stringify(a.rows));
-  const s = await pool.query(
-    'select gr.id, (select count(*)::int from guess_entry ge where ge.round_id = gr.id) as n from guess_round gr'
-  );
-  console.log("entrantcount:", JSON.stringify(s.rows));
   process.exit(0);
 })();

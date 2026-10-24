@@ -669,3 +669,88 @@ export const guessEntry = pgTable(
     index("guess_entry_round_idx").on(t.roundId),
   ]
 );
+
+// Group poll — one two-option question ("Sunday pancakes: mami vs táta style?").
+// The friendly joke: the MINORITY side wins in full, the majority gets a kind
+// token (configurable, often Ɱ0). One open round at a time is an admin habit,
+// not an invariant; closing is by closeAt, settling pays per vote.
+export const pollRound = pgTable(
+  "poll_round",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    qCs: text("q_cs").notNull(),
+    qEn: text("q_en").notNull(),
+    aCs: text("a_cs").notNull(),
+    aEn: text("a_en").notNull(),
+    bCs: text("b_cs").notNull(),
+    bEn: text("b_en").notNull(),
+    closeAt: timestamp("close_at", { withTimezone: true }).notNull(),
+    status: text("status").notNull().default("open"), // open | settled
+    rewardCents: integer("reward_cents").notNull().default(10_000), // per minority voter
+    consolationCents: integer("consolation_cents").notNull().default(0), // majority token, often off
+    winningSide: text("winning_side"), // 'a' | 'b' | 'both' (tie) — stamped at settle
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    settledBy: text("settled_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("poll_round_status_idx").on(t.status, t.closeAt)]
+);
+
+export const pollVote = pgTable(
+  "poll_vote",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    pollId: uuid("poll_id").notNull().references(() => pollRound.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    side: text("side").notNull(), // 'a' | 'b' — switchable while the poll is open
+    rewardCents: integer("reward_cents").notNull().default(0), // payout stamp from settle
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("poll_vote_once_idx").on(t.pollId, t.userId),
+    index("poll_vote_poll_idx").on(t.pollId),
+  ]
+);
+
+// Word/emoji riddle — an admin posts "🍕🌧️" and the family races to type the
+// matching phrase. Every player gets EMOJI_MAX_ATTEMPTS guesses; the FIRST
+// correct guess takes the whole prize and settles the round on the spot.
+// The partial unique index below (one correct row per round) makes the
+// "first" in "first solver" race-safe.
+export const emojiRound = pgTable(
+  "emoji_round",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    emoji: text("emoji").notNull(), // the riddle face, e.g. "🍕🌧️"
+    answerCs: text("answer_cs").notNull(),
+    answerEn: text("answer_en").notNull(),
+    hintCs: text("hint_cs").notNull().default(""),
+    hintEn: text("hint_en").notNull().default(""),
+    hintAt: timestamp("hint_at", { withTimezone: true }).notNull(), // when the nudge unlocks
+    closeAt: timestamp("close_at", { withTimezone: true }).notNull(),
+    status: text("status").notNull().default("open"), // open | settled
+    rewardCents: integer("reward_cents").notNull().default(15_000), // first solver
+    winnerUserId: text("winner_user_id"),
+    revealedBy: text("revealed_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("emoji_round_status_idx").on(t.status, t.closeAt)]
+);
+
+export const emojiAttempt = pgTable(
+  "emoji_attempt",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    roundId: uuid("round_id").notNull().references(() => emojiRound.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    guess: text("guess").notNull(),
+    correct: boolean("correct").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // "First solver wins" as a database guarantee: at most one correct attempt
+    // row per round can exist under any concurrency.
+    uniqueIndex("emoji_first_solver_idx").on(t.roundId).where(sql`correct`),
+    index("emoji_attempt_round_idx").on(t.roundId, t.userId),
+  ]
+);
