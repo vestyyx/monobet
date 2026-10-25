@@ -9,6 +9,8 @@ import {
   emojiSolves,
   emojiNormalize,
   emojiAttemptsLeft,
+  questProofNoteOk,
+  photoDataUrlOk,
 } from "./fun";
 
 describe("funStreakMultiplier", () => {
@@ -100,5 +102,22 @@ describe("emoji answer matching", () => {
     expect(emojiAttemptsLeft(2)).toBe(1);
     expect(emojiAttemptsLeft(3)).toBe(0);
     expect(emojiAttemptsLeft(99)).toBe(0);
+  });
+});
+
+describe("batch 3 helpers", () => {
+  it("quest proof notes are capped, not large essays", () => {
+    expect(questProofNoteOk("")).toBe(true); // empty note = no proof needed
+    expect(questProofNoteOk("done, took photo")).toBe(true);
+    expect(questProofNoteOk(" ".repeat(400))).toBe(true); // trimmed
+    expect(questProofNoteOk("x".repeat(401))).toBe(false);
+  });
+
+  it("photo data URLs must be images within the size cap", () => {
+    expect(photoDataUrlOk("data:image/jpeg;base64,/9j/4AAQ")).toBe(true);
+    expect(photoDataUrlOk("data:image/png;base64,iVBOR")).toBe(true);
+    expect(photoDataUrlOk("data:text/html;base64,PGI+")).toBe(false);
+    expect(photoDataUrlOk("https://example.com/cat.jpg")).toBe(false);
+    expect(photoDataUrlOk("data:image/jpeg;base64," + "A".repeat(400_001))).toBe(false);
   });
 });

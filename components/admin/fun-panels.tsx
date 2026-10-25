@@ -1,12 +1,13 @@
 "use client";
 
-// Admin panels for the friendly games (batch 1): trivia bank curator +
-// closest-guess round manager with the settle/reveal action.
-import { useState, useTransition } from "react";
+// Admin panels for the friendly games (batches 1â€“3): trivia bank curator,
+// closest-guess rounds, group polls, emoji riddles, family quests and the
+// photo-guess review desk.
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Button, Input, Select, Badge, Card } from "@/components/ui/primitives";
-import { adminFunCreateTriviaQuestion, adminFunCreateGuessRound, adminFunCreatePoll, adminFunCreateEmojiRound, guessSettle, pollSettle, emojiReveal } from "@/lib/actions-fun";
+import { Button, Input, Select, Badge, Card, Textarea } from "@/components/ui/primitives";
+import { adminFunCreateTriviaQuestion, adminFunCreateGuessRound, adminFunCreatePoll, adminFunCreateEmojiRound, adminFunCreateQuest, adminFunCreatePhotoRound, guessSettle, pollSettle, emojiReveal, questReview, photoReveal, type QuestClaimAdminRow } from "@/lib/actions-fun";
 import { fmtMonos } from "@/lib/money";
 import { getT, type Lang } from "@/lib/i18n";
 import { Loader2, Coins, Target } from "lucide-react";
@@ -119,10 +120,10 @@ export function AdminTriviaPanel({ lang, bank }: { lang: Lang; bank: TriviaBankR
                     <div className="text-[13px] font-medium truncate">{q.qCs}</div>
                     <div className="text-[11.5px] text-faint truncate">{q.qEn}</div>
                   </div>
-                  <Badge tone="mute">Ɱ{Math.round(q.rewardCents / 100)}</Badge>
+                  <Badge tone="mute">â±®{Math.round(q.rewardCents / 100)}</Badge>
                 </div>
                 <div className="mt-1 flex flex-wrap gap-2 text-[11.5px] text-faint">
-                  <span>✔ {q.correctCs}</span>
+                  <span>âś” {q.correctCs}</span>
                   {q.shownDay && (
                     <span className="text-brand font-semibold">
                       {t.admTriviaShown} {q.shownDay}
@@ -146,7 +147,7 @@ export type GuessAdminRow = {
   unitCs: string;
   closeAt: Date | null;
   status: "open" | "settled";
-  canSettle: boolean; // server-computed: open AND clock expired → reveal time
+  canSettle: boolean; // server-computed: open AND clock expired â†’ reveal time
   entrants: number;
   answerValue: number | null;
   rewardCents: number;
@@ -197,7 +198,7 @@ export function AdminGuessPanel({ lang, rounds }: { lang: Lang; rounds: GuessAdm
       setSettling(null);
       if (!res.ok) toast.error(res.error ?? "Error");
       else {
-        toast.success(`${t.guessSettledT} · +${fmtMonos(res.paid ?? 0, { lang })}`);
+        toast.success(`${t.guessSettledT} Â· +${fmtMonos(res.paid ?? 0, { lang })}`);
         router.refresh();
       }
     });
@@ -273,7 +274,7 @@ export function AdminGuessPanel({ lang, rounds }: { lang: Lang; rounds: GuessAdm
                   <div className="mt-1 text-[11.5px] text-faint">
                     {r.answerValue != null
                       ? `${t.guessAnswerWas}: ${r.answerValue}`
-                      : closedLabel(r.closeAt)} · {r.entrants}
+                      : closedLabel(r.closeAt)} Â· {r.entrants}
                   </div>
                   {canSettle && (
                     <div className="mt-2 flex items-center gap-2">
@@ -301,7 +302,7 @@ export function AdminGuessPanel({ lang, rounds }: { lang: Lang; rounds: GuessAdm
 }
 
 function closedLabel(close: Date | null): string {
-  if (!close) return "—";
+  if (!close) return "â€”";
   return new Intl.DateTimeFormat("cs-CZ", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(close);
 }
 
@@ -326,7 +327,7 @@ function pollWinnerLabel(lang: Lang, winningSide: string | null): string {
   if (winningSide === "a") return "A";
   if (winningSide === "b") return "B";
   if (winningSide === "both") return t.pollWinners;
-  return "—";
+  return "â€”";
 }
 
 export function AdminPollPanel({ lang, polls }: { lang: Lang; polls: PollAdminRow[] }) {
@@ -374,7 +375,7 @@ export function AdminPollPanel({ lang, polls }: { lang: Lang; polls: PollAdminRo
       setSettling(null);
       if (!res.ok) toast.error(res.error ?? "Error");
       else {
-        toast.success(`${t.pollSettledT} · +${fmtMonos(res.paid ?? 0, { lang })}`);
+        toast.success(`${t.pollSettledT} Â· +${fmtMonos(res.paid ?? 0, { lang })}`);
         router.refresh();
       }
     });
@@ -457,7 +458,7 @@ export function AdminPollPanel({ lang, polls }: { lang: Lang; polls: PollAdminRo
                   <span>
                     A {p.countA} : {p.countB} B
                   </span>
-                  <span>Ɱ{Math.round(p.rewardCents / 100)}</span>
+                  <span>â±®{Math.round(p.rewardCents / 100)}</span>
                   {p.status === "settled" ? (
                     <span className="text-brand font-semibold">{t.admPollSettled(pollWinnerLabel(lang, p.winningSide))}</span>
                   ) : (
@@ -601,10 +602,341 @@ export function AdminEmojiPanel({ lang, rounds }: { lang: Lang; rounds: EmojiAdm
                 <div className="flex items-start gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="text-[13px] font-medium">
-                      {r.emoji} — {r.answerCs}
+                      {r.emoji} â€” {r.answerCs}
                     </div>
                     <div className="text-[11.5px] text-faint">
-                      {t.admEmojiHintAt} {closedLabel(r.hintAt)} · {closedLabel(r.closeAt)} · {r.tries}
+                      {t.admEmojiHintAt} {closedLabel(r.hintAt)} Â· {closedLabel(r.closeAt)} Â· {r.tries}
+                    </div>
+                  </div>
+                  <Badge tone={r.status === "settled" ? "ink" : "yes"}>
+                    {r.status === "settled" ? (r.winner ? `@${r.winner}` : t.pollSettledT) : t.admGuessOpenBadge}
+                  </Badge>
+                </div>
+                {r.status === "open" && (
+                  <div className="mt-2">
+                    <Button size="sm" onClick={() => reveal(r.id)} disabled={revealing === r.id}>
+                      {revealing === r.id && <Loader2 className="size-3.5 animate-spin" />}
+                      {t.admEmojiReveal}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+// ---------- family quests ----------
+export type PhotoAdminRow = {
+  id: string;
+  imageData: string;
+  answerCs: string;
+  hintAt: Date;
+  closeAt: Date;
+  status: "open" | "settled";
+  winner: string | null;
+  tries: number;
+  rewardCents: number;
+};
+
+export function AdminQuestPanel({ lang, claims }: { lang: Lang; claims: QuestClaimAdminRow[] }) {
+  const t = getT(lang);
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [titleCs, setTitleCs] = useState("");
+  const [titleEn, setTitleEn] = useState("");
+  const [descCs, setDescCs] = useState("");
+  const [reward, setReward] = useState("100");
+  const [proofKind, setProofKind] = useState("none");
+  const [proofAskCs, setProofAskCs] = useState("");
+  const [reviewing, setReviewing] = useState<string | null>(null);
+
+  const create = () => {
+    if (pending) return;
+    start(async () => {
+      const res = await adminFunCreateQuest({
+        titleCs,
+        titleEn,
+        descCs,
+        descEn: titleCs, // honest default: many family quests never translate past the title; admin edits later
+        proofKind,
+        proofAskCs,
+        proofAskEn: proofAskCs,
+        rewardMonos: parseFloat(reward) || 100,
+      });
+      if (!res.ok) toast.error(res.error ?? "Error");
+      else {
+        toast.success(t.savedToast);
+        setTitleCs(""); setTitleEn(""); setDescCs(""); setProofAskCs("");
+        router.refresh();
+      }
+    });
+  };
+
+  const review = (claimId: string, approve: boolean) => {
+    setReviewing(claimId);
+    start(async () => {
+      const res = await questReview(claimId, approve);
+      setReviewing(null);
+      if (!res.ok) toast.error(res.error ?? "Error");
+      else {
+        toast.success(approve ? `${t.admQuestApproved} Â· +${fmtMonos(res.paid ?? 0, { lang })}` : t.admQuestRejected);
+        router.refresh();
+      }
+    });
+  };
+
+  const pendingClaims = claims.filter((c) => c.status === "pending");
+  const history = claims.filter((c) => c.status !== "pending");
+
+  return (
+    <div className="grid gap-5 lg:grid-cols-2">
+      <Card className="p-5">
+        <h2 className="font-semibold text-[15px] mb-1 flex items-center gap-2">
+          <Coins className="size-4 text-brand" /> {t.admQuestNew}
+        </h2>
+        <p className="text-[12px] text-mute mb-4">{t.admQuestSub}</p>
+        <div className="grid gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="text-[11.5px] font-semibold text-mute">{t.admQuestTitleCs}</label>
+              <Input value={titleCs} onChange={(e) => setTitleCs(e.target.value)} className="mt-1" />
+            </div>
+            <div>
+              <label className="text-[11.5px] font-semibold text-mute">{t.admQuestTitleEn}</label>
+              <Input value={titleEn} onChange={(e) => setTitleEn(e.target.value)} className="mt-1" />
+            </div>
+          </div>
+          <div>
+            <label className="text-[11.5px] font-semibold text-mute">{t.admQuestDescCs}</label>
+            <Textarea value={descCs} onChange={(e) => setDescCs(e.target.value)} rows={2} className="mt-1" />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <label className="text-[11.5px] font-semibold text-mute">{t.admQuestProofKind}</label>
+              <Select value={proofKind} onChange={(e) => setProofKind(e.target.value)} className="mt-1">
+                <option value="none">{t.admQuestProofNone}</option>
+                <option value="text">{t.admQuestProofText}</option>
+                <option value="photo">{t.admQuestProofPhoto}</option>
+              </Select>
+            </div>
+            {proofKind !== "none" && (
+              <div className="sm:col-span-2">
+                <label className="text-[11.5px] font-semibold text-mute">{t.admQuestProofAsk}</label>
+                <Input value={proofAskCs} onChange={(e) => setProofAskCs(e.target.value)} className="mt-1" />
+              </div>
+            )}
+            <div className={proofKind !== "none" ? "" : "sm:col-span-2"}>
+              <label className="text-[11.5px] font-semibold text-mute">{t.admQuestReward}</label>
+              <Input type="number" value={reward} onChange={(e) => setReward(e.target.value)} className="mt-1 num" />
+            </div>
+          </div>
+          <div>
+            <Button onClick={create} disabled={pending || !titleCs.trim() || !titleEn.trim()}>
+              {pending && <Loader2 className="size-4 animate-spin" />} {t.admQuestCreateCta}
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      <Card className="p-5">
+        <h2 className="font-semibold text-[15px] mb-3">{t.admQuestClaims}</h2>
+        {claims.length === 0 ? (
+          <p className="text-[13px] text-mute">{t.admQuestClaimsEmpty}</p>
+        ) : (
+          <div className="grid gap-4">
+            {/* pending first â€” the review desk */}
+            {pendingClaims.length > 0 && (
+              <div className="grid gap-3">
+                <p className="text-[11.5px] font-bold tracking-wide text-brand uppercase">{t.admQuestPending}</p>
+                <div className="divide-y divide-line-2">
+                  {pendingClaims.map((c) => (
+                    <div key={c.id} className="py-3">
+                      <div className="flex items-start gap-3">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        {c.photoData && <img src={c.photoData} alt="" className="h-14 w-14 rounded-lg object-cover border border-line-2" />}
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[13px] font-medium">
+                            @{c.username} â†’ {c.questTitleCs}
+                          </div>
+                          {c.note && <div className="text-[12px] text-mute">â€ž{c.note}â€ť</div>}
+                        </div>
+                        <Badge tone="warn">{t.admQuestWaiting}</Badge>
+                      </div>
+                      <div className="mt-2 flex gap-2">
+                        <Button size="sm" onClick={() => review(c.id, true)} disabled={reviewing === c.id}>
+                          {reviewing === c.id && <Loader2 className="size-3.5 animate-spin" />} {t.admQuestApprove}
+                        </Button>
+                        <Button size="sm" variant="soft" onClick={() => review(c.id, false)} disabled={reviewing === c.id}>
+                          {t.admQuestReject}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* reviewed history */}
+            {history.length > 0 && (
+              <div className="grid gap-2">
+                <p className="text-[11.5px] font-bold tracking-wide text-faint uppercase">{t.admQuestHistory}</p>
+                <div className="max-h-[300px] overflow-y-auto divide-y divide-line-2">
+                  {history.map((c) => (
+                    <div key={c.id} className="py-2.5 flex items-center gap-3">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      {c.photoData && <img src={c.photoData} alt="" className="h-10 w-10 rounded-md object-cover border border-line-2" />}
+                      <div className="min-w-0 flex-1 text-[12.5px]">
+                        <span className="font-medium">@{c.username}</span> <span className="text-faint">Â· {c.questTitleCs}</span>
+                      </div>
+                      <Badge tone={c.status === "approved" ? "yes" : "mute"}>
+                        {c.status === "approved" ? t.admQuestApproved : t.admQuestRejected}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+// ---------- photo guess ----------
+export function AdminPhotoPanel({ lang, rounds }: { lang: Lang; rounds: PhotoAdminRow[] }) {
+  const t = getT(lang);
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [imageData, setImageData] = useState("");
+  const [answerCs, setAnswerCs] = useState("");
+  const [answerEn, setAnswerEn] = useState("");
+  const [hintCs, setHintCs] = useState("");
+  const [hintEn, setHintEn] = useState("");
+  const [hours, setHours] = useState("72");
+  const [reward, setReward] = useState("200");
+  const [revealing, setRevealing] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+
+  const create = () => {
+    if (pending) return;
+    start(async () => {
+      const res = await adminFunCreatePhotoRound({
+        imageData,
+        qCs: t.photoQCs,
+        qEn: t.photoQEn,
+        answerCs,
+        answerEn,
+        hintCs,
+        hintEn,
+        closeInHours: parseInt(hours, 10) || 72,
+        rewardMonos: parseFloat(reward) || 200,
+      });
+      if (!res.ok) toast.error(res.error ?? "Error");
+      else {
+        toast.success(t.savedToast);
+        setAnswerCs(""); setAnswerEn(""); setHintCs(""); setHintEn("");
+        setImageData("");
+        router.refresh();
+      }
+    });
+  };
+
+  const pickPhoto = async (file?: File | null) => {
+    if (!file) return;
+    try {
+      const { compressToDataUrl } = await import("@/components/quest-panel");
+      setImageData(await compressToDataUrl(file));
+    } catch {
+      toast.error(t.questPhotoFail);
+    }
+  };
+
+  const reveal = (id: string) => {
+    setRevealing(id);
+    start(async () => {
+      const res = await photoReveal(id);
+      setRevealing(null);
+      if (!res.ok) toast.error(res.error ?? "Error");
+      else {
+        toast.success(t.pollSettledT);
+        router.refresh();
+      }
+    });
+  };
+
+  return (
+    <div className="grid gap-5 lg:grid-cols-2">
+      <Card className="p-5">
+        <h2 className="font-semibold text-[15px] mb-1 flex items-center gap-2">
+          <Coins className="size-4 text-brand" /> {t.admPhotoNew}
+        </h2>
+        <p className="text-[12px] text-mute mb-4">{t.admPhotoSub}</p>
+        <div className="grid gap-3">
+          <div>
+            <label className="text-[11.5px] font-semibold text-mute">{t.admPhotoImage}</label>
+            <div className="mt-1 flex items-center gap-3">
+              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => pickPhoto(e.target.files?.[0])} />
+              <Button variant="soft" size="sm" onClick={() => fileRef.current?.click()}>
+                {t.admPhotoPick}
+              </Button>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {imageData && <img src={imageData} alt="" className="h-16 w-16 rounded-lg object-cover border border-line-2" />}
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="text-[11.5px] font-semibold text-mute">{t.admPhotoAnswerCs}</label>
+              <Input value={answerCs} onChange={(e) => setAnswerCs(e.target.value)} className="mt-1" />
+            </div>
+            <div>
+              <label className="text-[11.5px] font-semibold text-mute">{t.admPhotoAnswerEn}</label>
+              <Input value={answerEn} onChange={(e) => setAnswerEn(e.target.value)} className="mt-1" />
+            </div>
+            <div>
+              <label className="text-[11.5px] font-semibold text-mute">{t.admEmojiHintCs}</label>
+              <Input value={hintCs} onChange={(e) => setHintCs(e.target.value)} className="mt-1" />
+            </div>
+            <div>
+              <label className="text-[11.5px] font-semibold text-mute">{t.admEmojiHintEn}</label>
+              <Input value={hintEn} onChange={(e) => setHintEn(e.target.value)} className="mt-1" />
+            </div>
+            <div>
+              <label className="text-[11.5px] font-semibold text-mute">{t.admEmojiCloseIn}</label>
+              <Input type="number" value={hours} onChange={(e) => setHours(e.target.value)} className="mt-1 num" />
+            </div>
+            <div>
+              <label className="text-[11.5px] font-semibold text-mute">{t.admPhotoReward}</label>
+              <Input type="number" value={reward} onChange={(e) => setReward(e.target.value)} className="mt-1 num" />
+            </div>
+          </div>
+          <div>
+            <Button onClick={create} disabled={pending || !imageData || !answerCs.trim() || !answerEn.trim()}>
+              {pending && <Loader2 className="size-4 animate-spin" />} {t.admPhotoCreateCta}
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      <Card className="p-5">
+        <h2 className="font-semibold text-[15px] mb-3">{t.admPhotoRounds}</h2>
+        {rounds.length === 0 ? (
+          <p className="text-[13px] text-mute">{t.admPhotoRoundEmpty}</p>
+        ) : (
+          <div className="divide-y divide-line-2 max-h-[520px] overflow-y-auto">
+            {rounds.map((r) => (
+              <div key={r.id} className="py-3">
+                <div className="flex items-start gap-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={r.imageData} alt="" className="h-14 w-14 rounded-lg object-cover border border-line-2" />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[13px] font-medium">{r.answerCs}</div>
+                    <div className="text-[11.5px] text-faint">
+                      {t.admEmojiHintAt} {closedLabel(r.hintAt)} Â· {closedLabel(r.closeAt)} Â· {r.tries}
                     </div>
                   </div>
                   <Badge tone={r.status === "settled" ? "ink" : "yes"}>

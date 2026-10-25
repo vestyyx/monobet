@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { Brain, Target, Sparkles, PartyPopper, ArrowRight, MessageCircleQuestion } from "lucide-react";
+import { Brain, Target, Sparkles, MessageCircleQuestion, Compass, ImageIcon, ArrowRight, PartyPopper } from "lucide-react";
 import { getCurrentUser, isAdmin } from "@/lib/session";
 import { getLang } from "@/lib/lang-server";
 import { getT } from "@/lib/i18n";
@@ -45,6 +45,18 @@ export default async function GamesPage() {
       title: t.gamesEmojiTitle,
       desc: t.gamesEmojiDesc,
     },
+    {
+      href: "/quests",
+      Icon: Compass,
+      title: t.gamesQuestTitle,
+      desc: t.gamesQuestDesc,
+    },
+    {
+      href: "/photo",
+      Icon: ImageIcon,
+      title: t.gamesPhotoTitle,
+      desc: t.gamesPhotoDesc,
+    },
   ];
 
   return (
@@ -84,7 +96,7 @@ export default async function GamesPage() {
           </Link>
         ))}
 
-        {/* Coming-next party games — kept as registry-aligned placeholders. */}
+        {/* Coming-next — bracket pools stay postponed (registry-aligned). */}
         <Card className="p-5 sm:col-span-2 border-dashed">
           <div className="flex items-start gap-3">
             <span className="rounded-xl bg-surface-2 text-mute p-2.5">
