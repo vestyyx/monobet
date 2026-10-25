@@ -28,8 +28,8 @@
 | G1 | Games batch 1: Daily Trivia + Closest Guess | ✅ done | `3600a0b`, `8c36ec2` |
 | G2 | Games batch 2: Group Polls + Word/Emoji Guess | ✅ done | `54924ab` (PR #4) |
 | G3 | Games batch 3: Family Quests + Photo Guess | ✅ done | `51206da` (PR #5) |
-| 2.2 | Player money management + ledger-backed actions + audit log | ⬜ approved-in-principle | — |
-| 3 | Users, groups, approvals queue | ⬜ queued | — |
+| 2.2 | Player money management + ledger-backed actions + audit log | ✅ done | `1560d53` (PR #6) |
+| 3 | Users, groups, approvals queue | ⬜ next | — |
 | 4 | Moderation + suspicious activity | ⬜ queued | — |
 | 5 | Module admin pages (markets, games, gigs) | ⬜ queued | — |
 | 6 | Economy dashboard, config versioning, exports, reconciliation | ⬜ queued | — |
