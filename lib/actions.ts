@@ -36,6 +36,18 @@ import {
 // toNum, checkLiquidations, checkGroupLiquidations) live in
 // lib/tx-market.ts so ops scripts can run the identical code path.
 
+// Freeze gate (Phase 2.2): a frozen player can look around, but every
+// money-moving action refuses politely until an admin unfreezes them.
+// Admin money-adjustments deliberately DON'T pass through here.
+export async function assertNotFrozen(userId: string) {
+  const [r] = await db
+    .select({ f: schema.user.frozenAt })
+    .from(schema.user)
+    .where(eq(schema.user.id, userId))
+    .limit(1);
+  if (r?.f) throw new Error("Your account is frozen — an admin will sort it out");
+}
+
 // Crude spam brakes for a friends group — recent-row counts on the live
 // tables, generous thresholds, no new infra.
 async function assertNotSpam(userId: string, kind: "trade" | "comment" | "loan") {
@@ -238,6 +250,7 @@ export async function placeTrade(input: {
     const { marketId, outcome, side } = input;
     if (outcome !== "yes" && outcome !== "no") throw new Error("Bad outcome");
     await assertNotSpam(u.id, "trade");
+    await assertNotFrozen(u.id);
 
     let result!: { shares: number; costCents: number; price: number };
 
@@ -593,6 +606,7 @@ export async function claimDaily(): Promise<{
 }> {
   try {
     const u = await requireUser();
+    await assertNotFrozen(u.id);
     const paid = await db.transaction(async (tx) => {
       const user = await lockUser(tx, u.id);
       const last = user.lastClaimAt ? new Date(user.lastClaimAt).getTime() : 0;
@@ -631,6 +645,7 @@ async function claimRecurring(
 ): Promise<{ ok: boolean; error?: string; retryInH?: number }> {
   try {
     const u = await requireUser();
+    await assertNotFrozen(u.id);
     await db.transaction(async (tx) => {
       await lockUser(tx, u.id);
       const [last] = await tx
@@ -741,6 +756,7 @@ function bonusFail(check: string): string {
 export async function claimBonus(key: string): Promise<{ ok: boolean; error?: string }> {
   try {
     const u = await requireUser();
+    await assertNotFrozen(u.id);
     const bonus = BONUS_MAP.get(key as never);
     if (!bonus) throw new Error("Unknown reward");
 
@@ -2456,6 +2472,7 @@ export async function startJobShift(input: {
   const startedAt = Date.now();
   try {
     const u = await requireUser();
+    await assertNotFrozen(u.id);
     if (!JOBS.includes(input.job as Job)) throw new Error("Bad job");
     const job = input.job as Job;
     const problems = job === "math" ? genMathProblems() : null;
@@ -2831,6 +2848,7 @@ export async function duelPlay(input: {
 }): Promise<{ ok: boolean; error?: string; waiting?: boolean; mid?: boolean; tie?: boolean; settled?: boolean }> {
   try {
     const u = await requireUser();
+    await assertNotFrozen(u.id);
     const outcome = await db.transaction(async (tx): Promise<{ o: "waiting" | "tie" | "settled"; mid?: boolean }> => {
       const [c] = await tx.select().from(schema.challenge).where(eq(schema.challenge.id, input.id)).for("update").limit(1);
       if (!c || (u.id !== c.creatorId && u.id !== c.opponentId)) throw new Error("Not your duel");
@@ -3078,6 +3096,7 @@ export async function squadSend(username: string, amountCents: number): Promise<
     const u = await requireUser();
     const cents = Math.round(amountCents);
     if (!Number.isSafeInteger(cents) || cents < SQUAD_MIN_CENTS) throw new Error("Minimum Ɱ1");
+    await assertNotFrozen(u.id);
     const clean = username.trim().replace(/^@/, "");
     await db.transaction(async (tx) => {
       const { me } = await lockMySquad(tx, u.id);

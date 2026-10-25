@@ -19,7 +19,10 @@ export async function credit(
   amountCents: number,
   kind: string,
   marketId: string | null,
-  memo: string
+  memo: string,
+  // Admin-money extras (Phase 2.2): idempotency keys dedupe repeated
+  // submissions, batch ids tie bulk grants together for one-click undo.
+  extra?: { idemKey?: string; batchId?: string; allowNegative?: boolean }
 ) {
   const amt = Math.round(amountCents);
   // bigint columns can hold anything sane; this guards JS number precision
@@ -31,7 +34,8 @@ export async function credit(
     .where(eq(schema.user.id, userId))
     .returning({ balanceCents: schema.user.balanceCents });
   if (!u) throw new Error("User not found");
-  if (u.balanceCents < 0) throw new Error("Insufficient balance");
+  // Overdraft is a bug unless an admin explicitly warned about it.
+  if (u.balanceCents < 0 && !extra?.allowNegative) throw new Error("Insufficient balance");
   await tx.insert(schema.ledger).values({
     userId,
     amountCents: amt,
@@ -39,6 +43,8 @@ export async function credit(
     kind,
     marketId,
     memo,
+    idemKey: extra?.idemKey ?? null,
+    batchId: extra?.batchId ?? null,
   });
   return u.balanceCents;
 }
