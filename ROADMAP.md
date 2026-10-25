@@ -27,7 +27,7 @@
 | 2.1 | Admin architecture + module registry + new shell | ✅ done | `8cfeca2` |
 | G1 | Games batch 1: Daily Trivia + Closest Guess | ✅ done | `3600a0b`, `8c36ec2` |
 | G2 | Games batch 2: Group Polls + Word/Emoji Guess | ✅ done | `54924ab` (PR #4) |
-| G3 | Games batch 3: Family Quests + Photo Guess | ⬜ queued | — |
+| G3 | Games batch 3: Family Quests + Photo Guess | ✅ done | `51206da` (PR #5) |
 | 2.2 | Player money management + ledger-backed actions + audit log | ⬜ approved-in-principle | — |
 | 3 | Users, groups, approvals queue | ⬜ queued | — |
 | 4 | Moderation + suspicious activity | ⬜ queued | — |
@@ -78,12 +78,13 @@
 - [x] `emoji_round` + `emoji_attempt`: emoji riddles, 3 attempts, first correct solver takes the Ɱ150 — enforced by partial unique index `emoji_first_solver_idx`; nudge unlocks at 60 % of the round; answers never ship to the client; expired rounds auto-close lazily
 - [x] Admin creators `/admin/polls` + `/admin/word-guess`; registry `built: true`; `/poll` + `/emoji` live; `/games` hub at 4 cards; demo seed extended
 
-## ⏳ Next: games batch 3 (schema + actions + UI + admin + i18n + commit)
+## ✅ Done: games batch 3 (PR #5, `88ff472`, live)
+- [x] `quest` + `quest_claim`: real-life tasks ("take out the recycling") with `none | text | photo` proof; one claim per quest per player (unique index), rejected claims re-submit and reset to pending; approval pays the fixed reward through the ledger in-transaction + audit `game.questReview`
+- [x] `photo_round` + `photo_attempt`: admin publishes a compressed (canvas, ≤ 400 KB data URL stored in DB) photo; 3 guesses, nudge unlocks at 60 %, first correct solver settles and takes the Ɱ200 — enforced by partial unique index `photo_first_solver_idx`; answers never ship while open; expired rounds auto-close lazily (`revealedBy:"auto"`)
+- [x] Player pages `/quests` + `/photo` (claim/resubmit states, compressed photo upload with preview); admin `/admin/quests` (creator + review desk with proof-photo thumbs) + `/admin/photo-guess` (pick→compress→publish, guess counts, reveal); registry `built: true`; `/games` hub at 6 cards; ledger kind `photo` labels CZ/EN
+- [x] E2E green: claim→approve→ledger `quest` +Ɱ120 + audit; wrong guess burns attempt, "colorful bubbles!!!" settles + pays Ɱ200 `photo`; create + reveal audited (`game.questCreate`/`game.photoCreate`/`game.photoReveal`)
 
-### Games batch 3 — Family Quests + Photo Guess
-- [ ] `quest` (+ `quest_claim`): real-life tasks with text/photo proof → parent/admin approval → ledger payout
-- [ ] `photo` (+ `photo_entry`): admin uploads a photo, players guess what/where; uploads reviewed before publish
-- [ ] Bracket Pools postponed (deliberate)
+## ⏳ Next: admin phase 2.2 — player money management (approved plan below)
 
 ### After games: resume admin rebuild (approved plan below)
 
