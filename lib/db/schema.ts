@@ -291,6 +291,9 @@ export type LedgerKind =
   | "ad"
   | "bonus"
   | "grant"
+  | "deduct"
+  | "adjust"
+  | "reverse"
   | "buy"
   | "sell"
   | "payout"
@@ -322,9 +325,18 @@ export const ledger = pgTable(
     kind: text("kind").notNull(),
     marketId: uuid("market_id").references(() => market.id, { onDelete: "set null" }),
     memo: text("memo").notNull().default(""),
+    // Admin-money bookkeeping (Phase 2.2): idempotency keys make repeated
+    // submissions apply once; batch ids tie a bulk grant together for the
+    // one-click undo. Both are sparse — player-driven rows stay null.
+    idemKey: text("idem_key"),
+    batchId: text("batch_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("ledger_user_idx").on(t.userId, t.createdAt)]
+  (t) => [
+    index("ledger_user_idx").on(t.userId, t.createdAt),
+    uniqueIndex("ledger_idem_idx").on(t.idemKey).where(sql`"idem_key" is not null`),
+    index("ledger_batch_idx").on(t.batchId).where(sql`"batch_id" is not null`),
+  ]
 );
 
 // ---------- retention: weekly seasons ----------

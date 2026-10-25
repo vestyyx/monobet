@@ -9,6 +9,7 @@ import { eq, and, isNull, sql, desc } from "drizzle-orm";
 import { requireUser } from "@/lib/session";
 import { assertRole } from "@/lib/admin/rbac";
 import { credit, lockUser, type Tx } from "@/lib/tx-market";
+import { audit } from "@/lib/audit";
 import { getLang } from "@/lib/lang-server";
 import type { Lang } from "@/lib/i18n";
 import {
@@ -32,31 +33,9 @@ import {
   EMOJI_REWARD_CENTS,
 } from "@/lib/fun";
 
-// ---------- audit (shared by every admin action across the panel) ----------
-// The audit log is append-only: no update/delete path will ever exist. Called
-// inside the same transaction as the action it describes.
-export async function audit(
-  tx: Tx,
-  adminId: string,
-  adminName: string,
-  action: string,
-  targetType: string,
-  targetId: string,
-  reason: string,
-  before?: unknown,
-  after?: unknown
-) {
-  await tx.insert(schema.adminAudit).values({
-    adminId,
-    adminName,
-    action,
-    targetType,
-    targetId,
-    reason,
-    before: (before ?? null) as never,
-    after: (after ?? null) as never,
-  });
-}
+// ---------- audit ----------
+// The audit writer lives in lib/audit.ts (not "use server" — never a client
+// endpoint). Every admin action imports it and logs inside its transaction.
 
 // ---------- Daily trivia ----------
 
