@@ -21,6 +21,10 @@ import {
   emojiSolves,
   emojiAttemptsLeft,
   funRoundOpen,
+  questProofNoteOk,
+  photoDataUrlOk,
+  QUEST_REWARD_CENTS,
+  PHOTO_REWARD_CENTS,
   GUESS_REWARD_CENTS,
   GUESS_CONSOLATION_CENTS,
   TRIVIA_REWARD_BY_DIFFICULTY,
@@ -803,5 +807,398 @@ export async function adminFunCreateEmojiRound(input: {
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Could not create the riddle" };
+  }
+}
+
+// ---------- Family quests ----------
+
+export type QuestView = {
+  id: string;
+  title: string;
+  desc: string;
+  rewardCents: number;
+  proofKind: "none" | "text" | "photo";
+  proofAsk: string | null;
+  // my claim, if any (one per quest per player — rejected can be re-submitted)
+  claimStatus: "pending" | "approved" | "rejected" | null;
+  myNote: string | null;
+  myPhotoData: string | null; // the player's own proof photo
+  myRewardCents: number;
+};
+
+// Active quests with the caller's claim state. Approvals/rejections are made
+// in the admin panel; a rejection leaves the claim reusable for re-submission.
+export async function questList(limit = 20): Promise<QuestView[]> {
+  const lang: Lang = await getLang();
+  const u = await requireUser();
+
+  const quests = await db
+    .select()
+    .from(schema.quest)
+    .where(eq(schema.quest.active, true))
+    .orderBy(desc(schema.quest.createdAt))
+    .limit(limit);
+  const ids = quests.map((q) => q.id);
+  const claims = ids.length
+    ? await db
+        .select()
+        .from(schema.questClaim)
+        .where(and(eq(schema.questClaim.userId, u.id), sql`${schema.questClaim.questId} in (${sql.join(ids.map((i) => sql`${i}`), sql`, `)})`))
+    : [];
+
+  return quests.map((q) => {
+    const mine = claims.find((c) => c.questId === q.id);
+    return {
+      id: q.id,
+      title: lang === "cs" ? q.titleCs : q.titleEn,
+      desc: lang === "cs" ? q.descCs : q.descEn,
+      rewardCents: q.rewardCents,
+      proofKind: (q.proofKind as "none" | "text" | "photo") ?? "none",
+      proofAsk: (lang === "cs" ? q.proofAskCs : q.proofAskEn) || null,
+      claimStatus: (mine?.status as "pending" | "approved" | "rejected" | undefined) ?? null,
+      myNote: mine?.note ?? null,
+      myPhotoData: mine?.photoData ?? null,
+      myRewardCents: mine?.rewardCents ?? 0,
+    };
+  });
+}
+
+// Claim a quest (or re-submit after a rejection). One claim per quest per
+// player via the unique index; claiming is free of charge, approval pays.
+export async function questClaimStart(
+  questId: string,
+  noteRaw: string,
+  photoData?: string
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const u = await requireUser();
+    if (u.frozenAt) throw new Error("Account frozen");
+    const note = (noteRaw ?? "").trim().slice(0, 400);
+    if (!questProofNoteOk(note)) throw new Error("Note is too long");
+    const photo = photoData && photoDataUrlOk(photoData) ? photoData : photoData ? null : undefined;
+    if (photo === null) throw new Error("The photo is too large or not an image");
+
+    await db.transaction(async (tx) => {
+      const [q] = await tx.select().from(schema.quest).where(eq(schema.quest.id, questId)).for("update").limit(1);
+      if (!q || !q.active) throw new Error("Quest not found");
+      if (q.proofKind === "photo" && !photo) throw new Error("This quest needs a photo");
+      if (q.proofKind === "text" && !note) throw new Error("Write the proof answer");
+
+      const [existing] = await tx
+        .select()
+        .from(schema.questClaim)
+        .where(and(eq(schema.questClaim.questId, q.id), eq(schema.questClaim.userId, u.id)))
+        .for("update")
+        .limit(1);
+      if (existing) {
+        if (existing.status === "pending") throw new Error("Already waiting for review");
+        if (existing.status === "approved") return; // done is done
+        // rejected → re-submit: reset with fresh proof
+        await tx
+          .update(schema.questClaim)
+          .set({ status: "pending", note, photoData: photo ?? existing.photoData, reviewedBy: null, reviewedAt: null })
+          .where(eq(schema.questClaim.id, existing.id));
+      } else {
+        await tx.insert(schema.questClaim).values({ questId: q.id, userId: u.id, note, photoData: photo ?? null });
+      }
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Could not claim the quest" };
+  }
+}
+
+export type QuestClaimAdminRow = {
+  id: string;
+  questId: string;
+  questTitleCs: string;
+  username: string;
+  status: "pending" | "approved" | "rejected";
+  note: string;
+  photoData: string | null;
+  rewardCents: number;
+  createdAt: Date;
+};
+
+export async function questClaimsForAdmin(limit = 60): Promise<QuestClaimAdminRow[]> {
+  await assertRole("moderator");
+  const rows = await db
+    .select({
+      id: schema.questClaim.id,
+      questId: schema.questClaim.questId,
+      questTitleCs: schema.quest.titleCs,
+      username: schema.user.username,
+      status: schema.questClaim.status,
+      note: schema.questClaim.note,
+      photoData: schema.questClaim.photoData,
+      rewardCents: schema.questClaim.rewardCents,
+      createdAt: schema.questClaim.createdAt,
+    })
+    .from(schema.questClaim)
+    .innerJoin(schema.quest, eq(schema.quest.id, schema.questClaim.questId))
+    .innerJoin(schema.user, eq(schema.user.id, schema.questClaim.userId))
+    .orderBy(desc(schema.questClaim.createdAt))
+    .limit(limit);
+  return rows.map((r) => ({ ...r, username: r.username ?? "?", status: (r.status as "pending" | "approved" | "rejected") ?? "pending" }));
+}
+
+// Review a claim: approval pays the quest reward through the ledger; a
+// rejection re-opens the claim for the player to fix. Audited either way.
+export async function questReview(claimId: string, approve: boolean): Promise<{ ok: boolean; error?: string; paid?: number }> {
+  try {
+    const admin = await assertRole("moderator");
+    let paid = 0;
+    await db.transaction(async (tx) => {
+      const [c] = await tx.select().from(schema.questClaim).where(eq(schema.questClaim.id, claimId)).for("update").limit(1);
+      if (!c) throw new Error("Claim not found");
+      if (c.status !== "pending") throw new Error("Already reviewed");
+      const [q] = await tx.select().from(schema.quest).where(eq(schema.quest.id, c.questId)).for("update").limit(1);
+      if (!q) throw new Error("Quest not found");
+
+      if (approve) {
+        const reward = q.rewardCents > 0 ? q.rewardCents : QUEST_REWARD_CENTS;
+        await tx
+          .update(schema.questClaim)
+          .set({ status: "approved", rewardCents: reward, reviewedBy: admin.id, reviewedAt: new Date() })
+          .where(eq(schema.questClaim.id, c.id));
+        await lockUser(tx, c.userId);
+        await credit(tx, c.userId, reward, "quest", null, `Family quest completed — ${q.titleCs}`);
+        paid = reward;
+      } else {
+        await tx
+          .update(schema.questClaim)
+          .set({ status: "rejected", reviewedBy: admin.id, reviewedAt: new Date() })
+          .where(eq(schema.questClaim.id, c.id));
+      }
+
+      await audit(tx, admin.id, admin.username ?? "admin", "game.questReview", "quest_claim", c.id, approve ? "approved" : "rejected");
+    });
+    return { ok: true, paid };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Review failed" };
+  }
+}
+
+export async function adminFunCreateQuest(input: {
+  titleCs: string;
+  titleEn: string;
+  descCs: string;
+  descEn: string;
+  proofKind: string;
+  proofAskCs: string;
+  proofAskEn: string;
+  rewardMonos: number;
+}): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const admin = await assertRole("moderator");
+    const titleCs = input.titleCs?.trim();
+    const titleEn = input.titleEn?.trim();
+    if (!titleCs || !titleEn) throw new Error("Write the title in both languages");
+    const proofKind = input.proofKind === "photo" ? "photo" : input.proofKind === "text" ? "text" : "none";
+    if (proofKind !== "none" && !input.proofAskCs?.trim()) throw new Error("Say what the proof should be");
+    const reward = Math.max(0, Math.round((Number(input.rewardMonos) || 100) * 100));
+
+    await db.transaction(async (tx) => {
+      await tx.insert(schema.quest).values({
+        titleCs,
+        titleEn,
+        descCs: input.descCs?.trim() ?? "",
+        descEn: input.descEn?.trim() ?? "",
+        rewardCents: reward,
+        proofKind,
+        proofAskCs: input.proofAskCs?.trim() ?? "",
+        proofAskEn: input.proofAskEn?.trim() ?? "",
+        createdBy: admin.id,
+      });
+      await audit(tx, admin.id, admin.username ?? "admin", "game.questCreate", "quest", "", titleCs ?? "");
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Could not create the quest" };
+  }
+}
+
+// ---------- Photo guess (macro-shot races) ----------
+
+export type PhotoView = {
+  id: string;
+  imageData: string;
+  q: string;
+  closeAt: Date;
+  status: "open" | "settled";
+  hint: string | null;
+  hintUnlocked: boolean;
+  myAttempts: number;
+  attemptsLeft: number;
+  myGuesses: string[];
+  solved: boolean;
+  solvedByMe: boolean;
+  winnerUsername: string | null;
+  answer: string | null; // settled rounds only
+  rewardCents: number;
+};
+
+export async function photoList(limit = 12): Promise<PhotoView[]> {
+  const lang: Lang = await getLang();
+  const u = await requireUser();
+
+  const rounds = await db.select().from(schema.photoRound).orderBy(desc(schema.photoRound.createdAt)).limit(limit);
+
+  // Lazy close for expired unsolved rounds — reveal the answer, nobody pays.
+  const expired = rounds.filter((r) => r.status === "open" && !funRoundOpen(r.status, r.closeAt));
+  for (const r of expired) {
+    await db.transaction(async (tx) => {
+      const [row] = await tx.select().from(schema.photoRound).where(eq(schema.photoRound.id, r.id)).for("update").limit(1);
+      if (!row || row.status !== "open" || funRoundOpen(row.status, row.closeAt)) return;
+      await tx.update(schema.photoRound).set({ status: "settled", revealedBy: "auto" }).where(eq(schema.photoRound.id, row.id));
+      await audit(tx, "auto", "auto", "game.photoAutoClose", "photo_round", row.id, "No solver before close");
+    });
+  }
+
+  const ids = rounds.map((r) => r.id);
+  const attempts = ids.length
+    ? await db
+        .select({ roundId: schema.photoAttempt.roundId, userId: schema.photoAttempt.userId, guess: schema.photoAttempt.guess, correct: schema.photoAttempt.correct })
+        .from(schema.photoAttempt)
+        .where(sql`${schema.photoAttempt.roundId} in (${sql.join(ids.map((i) => sql`${i}`), sql`, `)})`)
+    : [];
+  const winnerNames = new Map<string, string>();
+  const winners = rounds.filter((r) => r.winnerUserId);
+  if (winners.length) {
+    const wrows = await db
+      .select({ id: schema.user.id, username: schema.user.username })
+      .from(schema.user)
+      .where(sql`${schema.user.id} in (${sql.join(winners.map((w) => sql`${w.winnerUserId!}`), sql`, `)})`);
+    for (const w of wrows) winnerNames.set(w.id, w.username ?? "?");
+  }
+
+  return rounds.map((r) => {
+    const settled = r.status === "settled";
+    const mine = attempts.filter((a) => a.roundId === r.id && a.userId === u.id);
+    const hintUnlocked = settled || new Date(r.hintAt).getTime() <= Date.now();
+    return {
+      id: r.id,
+      imageData: r.imageData,
+      q: lang === "cs" ? r.qCs : r.qEn,
+      closeAt: r.closeAt,
+      status: (r.status as "open" | "settled") ?? "open",
+      hint: hintUnlocked ? (lang === "cs" ? r.hintCs : r.hintEn) || null : null,
+      hintUnlocked,
+      myAttempts: mine.length,
+      attemptsLeft: emojiAttemptsLeft(mine.length),
+      myGuesses: mine.map((m) => m.guess),
+      solved: settled && r.winnerUserId != null,
+      solvedByMe: settled && r.winnerUserId === u.id,
+      winnerUsername: r.winnerUserId ? winnerNames.get(r.winnerUserId) ?? null : null,
+      answer: settled ? (lang === "cs" ? r.answerCs : r.answerEn) : null,
+      rewardCents: r.rewardCents,
+    };
+  });
+}
+
+// One typed guess against the photo. Identical shape to emojiGuess: the
+// partial unique index guarantees exactly one first solver per round.
+export async function photoGuess(roundId: string, guessRaw: string): Promise<{ ok: boolean; error?: string; correct?: boolean; attemptsLeft?: number }> {
+  try {
+    const u = await requireUser();
+    if (u.frozenAt) throw new Error("Account frozen");
+    const guess = (guessRaw ?? "").trim().slice(0, 120);
+    if (!guess) throw new Error("Type a guess");
+
+    let out: { ok: true; correct: boolean; attemptsLeft: number } = { ok: true, correct: false, attemptsLeft: 0 };
+    await db.transaction(async (tx) => {
+      const [r] = await tx.select().from(schema.photoRound).where(eq(schema.photoRound.id, roundId)).for("update").limit(1);
+      if (!r) throw new Error("Photo round not found");
+      if (!funRoundOpen(r.status, r.closeAt)) throw new Error("This photo round is closed");
+
+      const mine = await tx
+        .select()
+        .from(schema.photoAttempt)
+        .where(and(eq(schema.photoAttempt.roundId, r.id), eq(schema.photoAttempt.userId, u.id)))
+        .for("update");
+      const left = emojiAttemptsLeft(mine.length);
+      if (left <= 0) throw new Error("Out of attempts — wait for the reveal");
+      const correct = emojiSolves(guess, r.answerCs, r.answerEn);
+
+      if (correct) {
+        await tx.insert(schema.photoAttempt).values({ roundId: r.id, userId: u.id, guess, correct });
+        await tx
+          .update(schema.photoRound)
+          .set({ status: "settled", winnerUserId: u.id, revealedBy: SOLVER_STAMP })
+          .where(eq(schema.photoRound.id, r.id));
+        const reward = r.rewardCents > 0 ? r.rewardCents : PHOTO_REWARD_CENTS;
+        await credit(tx, u.id, reward, "photo", null, "Photo guess — first solver!");
+        out = { ok: true, correct: true, attemptsLeft: emojiAttemptsLeft(mine.length + 1) };
+      } else {
+        await tx.insert(schema.photoAttempt).values({ roundId: r.id, userId: u.id, guess, correct: false });
+        out = { ok: true, correct: false, attemptsLeft: left - 1 };
+      }
+    });
+    return out;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Could not record your guess";
+    if (msg.includes("photo_first_solver_idx") || msg.includes("duplicate key")) {
+      return { ok: false, error: "Someone was a hair faster — this photo is solved" };
+    }
+    return { ok: false, error: msg };
+  }
+}
+
+// Admin reveal for a photo round nobody solved (or an early close).
+export async function photoReveal(roundId: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const admin = await assertRole("moderator");
+    await db.transaction(async (tx) => {
+      const [r] = await tx.select().from(schema.photoRound).where(eq(schema.photoRound.id, roundId)).for("update").limit(1);
+      if (!r) throw new Error("Photo round not found");
+      if (r.status === "settled") throw new Error("Already settled");
+      await tx.update(schema.photoRound).set({ status: "settled", revealedBy: admin.id }).where(eq(schema.photoRound.id, r.id));
+      await audit(tx, admin.id, admin.username ?? "admin", "game.photoReveal", "photo_round", r.id, r.answerCs);
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Reveal failed" };
+  }
+}
+
+export async function adminFunCreatePhotoRound(input: {
+  imageData: string;
+  qCs: string;
+  qEn: string;
+  answerCs: string;
+  answerEn: string;
+  hintCs: string;
+  hintEn: string;
+  closeInHours: number;
+  rewardMonos: number;
+}): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const admin = await assertRole("moderator");
+    if (!photoDataUrlOk(input.imageData ?? "")) throw new Error("Upload a compressed image (JPEG/PNG/WebP)");
+    const answerCs = input.answerCs?.trim();
+    const answerEn = input.answerEn?.trim();
+    if (!answerCs || !answerEn) throw new Error("Write the answer in both languages");
+    const hours = Math.max(1, Math.min(24 * 30, Math.round(Number(input.closeInHours) || 24 * 3)));
+    const hintAt = new Date(Date.now() + hours * 0.6 * 3_600_000);
+    const reward = Math.max(0, Math.round((Number(input.rewardMonos) || 200) * 100));
+
+    await db.transaction(async (tx) => {
+      await tx.insert(schema.photoRound).values({
+        imageData: input.imageData,
+        qCs: input.qCs?.trim() ?? "Co je na fotce?",
+        qEn: input.qEn?.trim() ?? "What's in the photo?",
+        answerCs,
+        answerEn,
+        hintCs: input.hintCs?.trim() ?? "",
+        hintEn: input.hintEn?.trim() ?? "",
+        hintAt,
+        closeAt: new Date(Date.now() + hours * 3_600_000),
+        rewardCents: reward,
+      });
+      await audit(tx, admin.id, admin.username ?? "admin", "game.photoCreate", "photo_round", "", (input.qCs ?? "").slice(0, 120));
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Could not publish the photo" };
   }
 }

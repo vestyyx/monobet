@@ -122,3 +122,31 @@ export function funRoundOpen(status: string, closeAt: string | number | Date): b
   if (status !== "open") return false;
   return new Date(closeAt).getTime() > Date.now();
 }
+
+// ---------- family quests ----------
+// Default payout for an approved quest claim (Ɱ100); the admin sets it per
+// quest, small fixed amounts only.
+export const QUEST_REWARD_CENTS = 10_000;
+
+// Validate a submitted proof note / photo without touching the DB:
+// notes are capped short (it's a claim message, not an essay), photos must be
+// data URLs of a sane, family-friendly size (client compresses to ≤ ~250 KB).
+export const QUEST_PROOF_NOTE_MAX = 400;
+export const PHOTO_DATA_URL_MAX = 400_000; // chars of "<data URL>"
+
+export function questProofNoteOk(note: string): boolean {
+  return (note ?? "").trim().length <= QUEST_PROOF_NOTE_MAX;
+}
+
+export function photoDataUrlOk(dataUrl: string): boolean {
+  return /^data:image\/(jpeg|png|webp);base64,/.test(dataUrl ?? "") && (dataUrl ?? "").length <= PHOTO_DATA_URL_MAX;
+}
+
+// ---------- photo guess ----------
+export const PHOTO_MAX_ATTEMPTS = 3;
+// Default first-solver prize (Ɱ200) — macro shots are harder than emoji.
+export const PHOTO_REWARD_CENTS = 20_000;
+
+// First-solver "one correct attempt row" race safety is enforced by the photo
+// partial unique index; the answer comparison reuses emojiSolves/emojiNormalize
+// (identical CZ/EN typed-answer semantics for both riddle families).

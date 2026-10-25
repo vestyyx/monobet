@@ -309,6 +309,7 @@ export type LedgerKind =
   | "guess"
   | "poll"
   | "emoji"
+  | "photo"
   | "quest";
 
 export const ledger = pgTable(
@@ -752,5 +753,94 @@ export const emojiAttempt = pgTable(
     // row per round can exist under any concurrency.
     uniqueIndex("emoji_first_solver_idx").on(t.roundId).where(sql`correct`),
     index("emoji_attempt_round_idx").on(t.roundId, t.userId),
+  ]
+);
+
+// Family quests — real-life tasks ("take the recycling down", "read 20
+// pages"). Players claim a quest, optionally attach proof (a note, or a photo
+// for bigger deeds), and a parent/admin reviews the claim: approval pays the
+// fixed reward through the ledger, rejection costs nothing. One claim per
+// quest per player; a rejected claim can be re-submitted (reset to pending).
+export const quest = pgTable(
+  "quest",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    titleCs: text("title_cs").notNull(),
+    titleEn: text("title_en").notNull(),
+    descCs: text("desc_cs").notNull().default(""),
+    descEn: text("desc_en").notNull().default(""),
+    rewardCents: integer("reward_cents").notNull().default(10_000), // per approved claim
+    proofKind: text("proof_kind").notNull().default("none"), // none | text | photo
+    proofAskCs: text("proof_ask_cs").notNull().default(""), // what to write / show
+    proofAskEn: text("proof_ask_en").notNull().default(""),
+    active: boolean("active").notNull().default(true),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("quest_active_idx").on(t.active, t.createdAt)]
+);
+
+export const questClaim = pgTable(
+  "quest_claim",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    questId: uuid("quest_id").notNull().references(() => quest.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    status: text("status").notNull().default("pending"), // pending | approved | rejected
+    note: text("note").notNull().default(""), // text proof or a note to the parent
+    photoData: text("photo_data"), // data URL when the quest asks for photo proof
+    rewardCents: integer("reward_cents").notNull().default(0), // payout stamp
+    reviewedBy: text("reviewed_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("quest_claim_once_idx").on(t.questId, t.userId),
+    index("quest_claim_status_idx").on(t.status, t.createdAt),
+  ]
+);
+
+// Photo guess — the admin publishes a photo ("what is this a macro shot of?")
+// and the family races to name it. Same race mechanics as emoji riddles:
+// three guesses per player, first correct solver settles the round and takes
+// the prize (partial unique index = race-safe), nudge unlocks mid-round.
+// Photos are stored as compressed data URLs directly in the DB — small,
+// family-scale amounts only, no external storage needed.
+export const photoRound = pgTable(
+  "photo_round",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    imageData: text("image_data").notNull(), // data URL (image/jpeg|png|webp, compressed)
+    qCs: text("q_cs").notNull(), // e.g. "Co je na fotce?"
+    qEn: text("q_en").notNull(),
+    answerCs: text("answer_cs").notNull(),
+    answerEn: text("answer_en").notNull(),
+    hintCs: text("hint_cs").notNull().default(""),
+    hintEn: text("hint_en").notNull().default(""),
+    hintAt: timestamp("hint_at", { withTimezone: true }).notNull(),
+    closeAt: timestamp("close_at", { withTimezone: true }).notNull(),
+    status: text("status").notNull().default("open"), // open | settled
+    rewardCents: integer("reward_cents").notNull().default(20_000), // first solver
+    winnerUserId: text("winner_user_id"),
+    revealedBy: text("revealed_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("photo_round_status_idx").on(t.status, t.closeAt)]
+);
+
+export const photoAttempt = pgTable(
+  "photo_attempt",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    roundId: uuid("round_id").notNull().references(() => photoRound.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    guess: text("guess").notNull(),
+    correct: boolean("correct").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // Same first-solver guarantee as the emoji riddles — one correct row max.
+    uniqueIndex("photo_first_solver_idx").on(t.roundId).where(sql`correct`),
+    index("photo_attempt_round_idx").on(t.roundId, t.userId),
   ]
 );

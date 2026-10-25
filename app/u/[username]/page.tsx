@@ -364,6 +364,7 @@ function KindBadge({ kind, lang }: { kind: string; lang?: Lang }) {
     guess: { label: t.kindGuess, tone: "yes" },
     poll: { label: t.kindPoll, tone: "yes" },
     emoji: { label: t.kindEmoji, tone: "yes" },
+    photo: { label: t.kindPhoto, tone: "yes" },
     quest: { label: t.kindQuest, tone: "yes" },
   };
   const { label, tone } = map[kind] ?? { label: kind, tone: "mute" as const };

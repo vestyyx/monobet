@@ -1,11 +1,14 @@
-// Seed demo content for the family-games corner (batch 1: trivia + guess).
+// Seed demo content for the family-games corner (batches 1–3: trivia, guess,
+// polls, emoji riddles, quests, photo guess).
 //   npx tsx scripts/seed-fun.ts          # shows what it would add (dry run)
 //   npx tsx scripts/seed-fun.ts --apply  # writes
-// Adds a small starter bank + an open guess round unless they already exist
+// Adds a small starter bank + open rounds unless they already exist
 // (idempotent: reruns skip).
 import { db, schema } from "@/lib/db";
 import { config } from "dotenv";
 import { eq, and, sql } from "drizzle-orm";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 config({ path: ".env.local" });
 
@@ -116,6 +119,63 @@ async function main() {
     }
   } else {
     console.log("[seed] an open emoji riddle already exists — skipping");
+  }
+
+  // ---------- family quest ----------
+  const openQuests = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(schema.quest)
+    .where(eq(schema.quest.active, true));
+  if ((openQuests[0]?.n ?? 0) === 0) {
+    console.log("[seed] adding 1 family quest (trust proof)");
+    if (apply) {
+      await db.insert(schema.quest).values({
+        titleCs: "Vynes odpad v den svozu",
+        titleEn: "Take out the recycling on collection day",
+        descCs: "Papíry i plasty, bez rozbrečení. Rodina to pozná.",
+        descEn: "Paper and plastics, without the curb drama.",
+        rewardCents: 12_000,
+        proofKind: "none",
+        proofAskCs: "",
+        proofAskEn: "",
+      });
+    }
+  } else {
+    console.log("[seed] an active quest already exists — skipping");
+  }
+
+  // ---------- photo guess round ----------
+  // The demo photo is a small generated JPEG stored as a committed data-URL
+  // next to this script (see scripts/gen-seed-photo.ps1).
+  const photoPath = join(process.cwd(), "scripts", "seed-photo-dataurl.txt");
+  let demoPhoto: string | null = null;
+  try {
+    demoPhoto = readFileSync(photoPath, "utf8").trim();
+  } catch {
+    demoPhoto = null; // missing file → skip photo seeding quietly
+  }
+  const openPhotos = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(schema.photoRound)
+    .where(eq(schema.photoRound.status, "open"));
+  if ((openPhotos[0]?.n ?? 0) === 0 && demoPhoto) {
+    console.log("[seed] adding 1 open photo round (3 days)");
+    if (apply) {
+      await db.insert(schema.photoRound).values({
+        imageData: demoPhoto,
+        qCs: "Co je na fotce?",
+        qEn: "What is in the photo?",
+        answerCs: "barevné bubliny",
+        answerEn: "colorful bubbles",
+        hintCs: "Kulaté, lesklé a kdyby praskly, umyly by ti předlohu.",
+        hintEn: "Round, shiny, and popping them would wash the table.",
+        hintAt: new Date(Date.now() + 18 * 3_600_000),
+        closeAt: new Date(Date.now() + 3 * 24 * 3_600_000),
+        rewardCents: 20_000,
+      });
+    }
+  } else {
+    console.log("[seed] an open photo round already exists (or demo photo missing) — skipping");
   }
 
   if (!apply) console.log("[seed] dry run — rerun with --apply to write");

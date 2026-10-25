@@ -219,7 +219,7 @@ export const ADMIN_MODULES: AdminModuleDef[] = [
     descCs: "Úkoly ze skutečného života s důkazem a odměnami.",
     icon: Compass,
     minRole: "admin",
-    built: false,
+    built: true, // live since family-games batch 3 — /admin/quests
     deliveryPhase: "Phase 4+ (family games)",
     group: "games",
   },
@@ -243,7 +243,7 @@ export const ADMIN_MODULES: AdminModuleDef[] = [
     descCs: "Kontrola fotek před zveřejněním, kola, vyhodnocení.",
     icon: ImageIcon,
     minRole: "admin",
-    built: false,
+    built: true, // live since family-games batch 3 — /admin/photo-guess
     deliveryPhase: "Phase 4+ (family games)",
     group: "games",
   },
