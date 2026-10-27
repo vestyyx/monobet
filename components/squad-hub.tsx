@@ -7,8 +7,8 @@ import { toast } from "sonner";
 import { Avatar, Badge, Button, Card, Input, Select } from "@/components/ui/primitives";
 import { fmtMonos } from "@/lib/money";
 import { getT, type Lang } from "@/lib/i18n";
-import { joinSquad, squadBorrow, squadContribute, squadRepay, squadSend } from "@/lib/actions";
-import { ArrowDownToLine, ArrowUpFromLine, HandCoins, PiggyBank, Send, Users } from "lucide-react";
+import { joinSquad, squadBorrow, squadContribute, squadRepay, squadSend, squadKick, joinSquadByCode } from "@/lib/actions";
+import { ArrowDownToLine, ArrowUpFromLine, Crown, HandCoins, PiggyBank, Send, UserX, Users, X } from "lucide-react";
 
 export type SquadMemberRow = {
   id: string;
@@ -17,6 +17,7 @@ export type SquadMemberRow = {
   image: string | null;
   balanceCents: number;
   squadDebtCents: number;
+  squadRole: string | null;
   netWorthCents: number;
   isMe: boolean;
 };
@@ -171,6 +172,43 @@ function SendCard({ members, lang }: { members: SquadMemberRow[]; lang: Lang }) 
   );
 }
 
+// Phase 3 — the Group Parent (or staff) removes a disruptive member.
+// Confirmation inline, no modal; server action re-checks the caller's rank.
+function MemberKick({ username, lang }: { username: string; lang: Lang }) {
+  const t = getT(lang);
+  const [pending, start] = useTransition();
+  const router = useRouter();
+  const [confirming, setConfirming] = useState(false);
+
+  if (!confirming)
+    return (
+      <Button variant="ghost" size="sm" className="shrink-0" disabled={pending} onClick={() => setConfirming(true)} title={t.squadKick}>
+        <UserX className="size-3.5" />
+      </Button>
+    );
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="shrink-0"
+      disabled={pending}
+      onClick={() =>
+        start(async () => {
+          const r = await squadKick(username);
+          if (r.ok) {
+            toast.success(t.squadKick);
+            router.refresh();
+          } else toast.error(r.error ?? "Failed");
+          setConfirming(false);
+        })
+      }
+    >
+      <X className="size-3.5" /> {t.squadKick}
+    </Button>
+  );
+}
+
 export function SquadHub({
   lang,
   squadName,
@@ -180,6 +218,8 @@ export function SquadHub({
   members,
   activity,
   now,
+  canKick,
+  squadPaused,
 }: {
   lang: Lang;
   squadName: string;
@@ -189,6 +229,8 @@ export function SquadHub({
   members: SquadMemberRow[];
   activity: SquadActivityRow[];
   now: number;
+  canKick: boolean;
+  squadPaused: boolean;
 }) {
   const t = getT(lang);
   const combined = members.reduce((s, m) => s + m.netWorthCents, 0);
@@ -197,6 +239,11 @@ export function SquadHub({
   return (
     <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_380px]">
       <div className="space-y-4">
+        {squadPaused && (
+          <div className="text-[12.5px] font-semibold text-warn bg-warn/10 border border-warn/30 rounded-lg px-3 py-1.5">
+            {t.squadPausedBanner}
+          </div>
+        )}
         <Card className="p-4">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
@@ -221,6 +268,7 @@ export function SquadHub({
                   <Avatar name={m.username ?? m.name} image={m.image} className="size-8" />
                   <div className="min-w-0">
                     <div className="text-[13.5px] font-semibold truncate group-hover:text-brand-strong">
+                      {m.squadRole === "parent" && <Crown className="inline size-3.5 -mt-0.5 mr-1 text-warn" />}
                       @{m.username ?? m.name}
                       {m.isMe && <span className="text-mute font-normal"> · {t.lbYou}</span>}
                     </div>
@@ -233,6 +281,7 @@ export function SquadHub({
                   </div>
                 </Link>
                 <span className="num text-[13px] font-bold">{fmtMonos(m.netWorthCents, { lang })}</span>
+                {canKick && !m.isMe && <MemberKick username={m.username ?? m.name} lang={lang} />}
               </div>
             ))}
           </div>
@@ -272,6 +321,7 @@ export function SquadHub({
 export function SquadJoinCard({ lang }: { lang: Lang }) {
   const t = getT(lang);
   const [name, setName] = useState("");
+  const [code, setCode] = useState("");
   const [pending, start] = useTransition();
   const router = useRouter();
 
@@ -298,6 +348,26 @@ export function SquadJoinCard({ lang }: { lang: Lang }) {
         </Button>
       </div>
       <p className="text-[11.5px] text-faint mt-2">{t.squadHint}</p>
+      {/* Phase 3 — invite code from the squad parent/admin */}
+      <div className="flex gap-2 mt-3">
+        <Input placeholder={t.squadCodePh} value={code} onChange={(e) => setCode(e.target.value)} maxLength={6} className="font-mono uppercase" />
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={pending || code.trim().length < 6}
+          onClick={() =>
+            start(async () => {
+              const r = await joinSquadByCode(code);
+              if (r.ok) {
+                toast.success(t.squadJoinedToast);
+                router.refresh();
+              } else toast.error(r.error ?? "Failed");
+            })
+          }
+        >
+          {t.squadCodeJoin}
+        </Button>
+      </div>
     </Card>
   );
 }

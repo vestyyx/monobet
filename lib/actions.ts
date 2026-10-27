@@ -14,6 +14,8 @@ import { resetEconomyTx } from "@/lib/economy-reset";
 import { accruedDebtCents, LOAN_PRESETS_CENTS, LOAN_OFFER_COUNT, LOAN_OFFER_TTL_MS, rollRateBps } from "@/lib/loans";
 import { capJobPay, dishesPay, DISH_PAY_CENTS, genMathProblems, JOBS, mathAnswer, mathPay, type Job, type MathProblem } from "@/lib/jobs";
 import { marketYesPrice, getMarketBetCount, getStatsSince } from "@/lib/queries";
+import { personalStakeCapCents } from "@/lib/admin-users";
+import { audit } from "@/lib/audit";
 import {
   DAILY_AMOUNT,
   DAILY_COOLDOWN_MS,
@@ -315,7 +317,10 @@ export async function placeTrade(input: {
         if (!Number.isFinite(spend) || spend < (levCfg?.minTrade ?? MIN_TRADE_CENTS)) throw new Error(`Minimum trade is Ɱ ${((levCfg?.minTrade ?? MIN_TRADE_CENTS) / 100).toFixed(0)}`);
         // Per-market ceiling wins when set; otherwise the global config cap.
         const spendCap = m.maxBetCents ?? levCfg?.maxSpend ?? MAX_TRADE_SPEND_CENTS;
-        if (spend > spendCap) throw new Error(`Max trade here is Ɱ ${(spendCap / 100).toFixed(0)}`);
+        // Phase 3 personal caps sit on TOP of the market ceiling: kids trade
+        // at most Ɱ50 per order, anyone the admins capped is capped tighter.
+        const personalCap = personalStakeCapCents(cur.kidMode, cur.maxStakeCents, spendCap);
+        if (spend > personalCap) throw new Error(`Max trade for you here is Ɱ ${(personalCap / 100).toFixed(0)}`);
         if (!TRADE_LEVERAGES.includes(leverage)) throw new Error("Bad leverage");
         const levCap = Math.min(m.maxLeverage, levCfg?.tMax ?? 100);
         if (leverage > levCap) throw new Error(`Max leverage here is ${levCap}×`);
@@ -1138,6 +1143,9 @@ export async function proposeMarket(input: {
     if (options.length === 1) throw new Error("Add at least 2 options, or leave options empty");
     if (options.length > 12) throw new Error("Max 12 options");
     if (options.some((o) => o.label.length > 60 || o.label.length === 0)) throw new Error("Option labels max 60 chars");
+    // Phase 3 — plain players proposing a plain yes/no question go through the
+    // moderation queue; multi-outcome votes stay instant (they're group games).
+    const needsApproval = !isAdmin(u) && u.role !== "moderator" && options.length === 0;
 
     const slug = await db.transaction(async (tx) => {
       const category = await resolveCategory(tx, input, u.id);
@@ -1212,7 +1220,9 @@ export async function proposeMarket(input: {
           description,
           context,
           category,
-          status: "live",
+          // Phase 3 approvals: non-staff proposals wait for a moderator; the
+          // approve action then stamps the opening price point.
+          status: needsApproval ? "pending" : "live",
           creatorId: u.id,
           b,
           qYes: qForProb(p, b).toFixed(6),
@@ -1227,14 +1237,17 @@ export async function proposeMarket(input: {
           imageUrl: marketImage,
         })
         .returning({ id: schema.market.id, slug: schema.market.slug });
-      await tx.insert(schema.pricePoint).values({ marketId: m.id, yesPrice: p.toFixed(5) });
+      if (!needsApproval) {
+        await tx.insert(schema.pricePoint).values({ marketId: m.id, yesPrice: p.toFixed(5) });
+      }
       return m.slug;
     });
 
     revalidatePath("/admin");
+    revalidatePath("/admin/approvals");
     revalidatePath("/");
     updateTag("categories");
-    return { ok: true, slug, live: true };
+    return { ok: true, slug, live: !needsApproval };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Failed to create market" };
   }
@@ -2978,6 +2991,8 @@ export async function joinSquad(name: string): Promise<{ ok: boolean; error?: st
     if (clean.length > 24) throw new Error("Squad name too long (max 24)");
     await db.transaction(async (tx) => {
       const [existing] = await tx.select().from(schema.squad).where(sql`lower(${schema.squad.name}) = lower(${clean})`).limit(1);
+      // Admin pause (Phase 3) freezes the door of the existing squad.
+      if (existing?.pausedAt) throw new Error("That squad is paused by an admin — try later");
       const squadId = existing?.id ?? (await tx.insert(schema.squad).values({ name: clean, createdBy: u.id }).returning({ id: schema.squad.id }))[0].id;
       await tx.update(schema.user).set({ squadId }).where(eq(schema.user.id, u.id));
     });
@@ -2994,7 +3009,7 @@ export async function leaveSquad(): Promise<{ ok: boolean; error?: string }> {
     await db.transaction(async (tx) => {
       const me = await lockUser(tx, u.id);
       if (me.squadDebtCents > 0) throw new Error("Repay your squad loan first");
-      await tx.update(schema.user).set({ squadId: null }).where(eq(schema.user.id, u.id));
+      await tx.update(schema.user).set({ squadId: null, squadRole: null }).where(eq(schema.user.id, u.id));
       await tx.delete(schema.squadInvite).where(eq(schema.squadInvite.inviteeId, u.id));
     });
     revalidatePath("/leaderboard");
@@ -3027,6 +3042,7 @@ export async function inviteToSquad(username: string): Promise<{ ok: boolean; er
     // Squads are exclusive — don't offer a chair to someone already seated.
     if (target.squadId) throw new Error("Already in a squad");
     const [sq] = await db.select().from(schema.squad).where(eq(schema.squad.id, me.squadId)).limit(1);
+    if (sq.pausedAt) throw new Error("Your squad is paused by an admin — invites are off");
     const inserted = await db
       .insert(schema.squadInvite)
       .values({ squadId: me.squadId, inviterId: u.id, inviteeId: target.id })
@@ -3056,6 +3072,9 @@ export async function respondSquadInvite(input: {
         .for("update");
       if (!inv) throw new Error("Invite not found");
       if (input.accept) {
+        // Paused squads (Phase 3) reject new members until an admin resumes them.
+        const [sq] = await tx.select().from(schema.squad).where(eq(schema.squad.id, inv.squadId)).limit(1);
+        if (sq?.pausedAt) throw new Error("That squad is paused by an admin — try later");
         const cur = await lockUser(tx, u.id);
         // Stale invite after already joining a squad — delete it, don't hop.
         if (cur.squadId) {
@@ -3086,6 +3105,8 @@ async function lockMySquad(tx: Tx, userId: string) {
   if (!me.squadId) throw new Error("Join a squad first");
   const [sq] = await tx.select().from(schema.squad).where(eq(schema.squad.id, me.squadId)).for("update").limit(1);
   if (!sq) throw new Error("Squad not found");
+  // Admin pause (Phase 3) also halts the pot: no sends, contributions or loans.
+  if (sq.pausedAt) throw new Error("Squad is paused by an admin");
   return { me, sq };
 }
 
@@ -3177,6 +3198,80 @@ export async function squadRepay(amountCents: number): Promise<{ ok: boolean; er
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Repay failed" };
+  }
+}
+
+// Phase 3 — invite codes. The squad parent shares a 6-char code (from the
+// admin groups page) so friends in real life can join without typing an
+// exact squad name. Case-insensitive by design: codes uppercase everywhere.
+export async function joinSquadByCode(code: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const u = await requireUser();
+    const clean = (code ?? "").trim().toUpperCase();
+    if (clean.length === 0) throw new Error("Enter the invite code");
+    await db.transaction(async (tx) => {
+      const me = await lockUser(tx, u.id);
+      if (me.squadId) throw new Error("You're already in a squad — leave it first");
+      const [sq] = await tx.select().from(schema.squad).where(eq(schema.squad.inviteCode, clean)).limit(1);
+      if (!sq || !sq.inviteEnabled) throw new Error("That code isn't valid");
+      if (sq.pausedAt) throw new Error("That squad is paused by an admin — try later");
+      await tx.update(schema.user).set({ squadId: sq.id }).where(eq(schema.user.id, u.id));
+      await ping(tx, u.id, `Welcome to “${sq.name}” — you joined with an invite code`);
+    });
+    revalidatePath("/leaderboard");
+    revalidatePath("/squads");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Join failed" };
+  }
+}
+
+// Phase 3 — the Group Parent runs their own circle: they can remove any
+// member (never the owner of that power). Staff (moderator+) may kick
+// anyone. Members with an open squad loan stay put until they repay.
+export async function squadKick(username: string, reason?: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const u = await requireUser();
+    const clean = (username ?? "").trim().replace(/^@/, "");
+    if (!clean) throw new Error("Pick a member");
+    const parentish = isAdmin(u) || u.role === "moderator";
+    await db.transaction(async (tx) => {
+      const me = await lockUser(tx, u.id);
+      if (!me.squadId) throw new Error("Join a squad first");
+      const isParent = me.squadRole === "parent";
+      if (!isParent && !parentish) throw new Error("Only the group parent may remove members");
+      const [target] = await tx
+        .select()
+        .from(schema.user)
+        .where(sql`lower(${schema.user.username}) = lower(${clean})`)
+        .for("update")
+        .limit(1);
+      if (!target) throw new Error("No such user");
+      if (target.squadId !== me.squadId) throw new Error("Not in your squad");
+      if (target.id === u.id) throw new Error("Use Leave instead");
+      if (target.squadRole === "parent" && !parentish) throw new Error("Only staff can remove the parent");
+      if (target.squadDebtCents > 0) throw new Error("Repay the squad loan first");
+      await tx.update(schema.user).set({ squadId: null, squadRole: null }).where(eq(schema.user.id, target.id));
+      await tx.delete(schema.squadInvite).where(eq(schema.squadInvite.inviteeId, target.id));
+      const why = (reason ?? "").trim() || `Kicked from squad by ${me.username ?? me.name}`;
+      await audit(
+        tx,
+        u.id,
+        me.username ?? me.name,
+        "group.kick",
+        "user",
+        target.id,
+        why,
+        { squadId: target.squadId },
+        { squadId: null }
+      );
+      await ping(tx, target.id, `You were removed from the squad — ${why}`);
+    });
+    revalidatePath("/leaderboard");
+    revalidatePath("/squads");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Kick failed" };
   }
 }
 

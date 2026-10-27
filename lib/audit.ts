@@ -3,7 +3,7 @@
 // would have exposed it to the network). Imported by server actions and called
 // inside the SAME transaction as the change it describes. The audit log is
 // append-only: no update/delete path will ever exist.
-import { db, schema } from "@/lib/db";
+import { schema } from "@/lib/db";
 import type { Tx } from "@/lib/tx-market";
 
 export async function audit(

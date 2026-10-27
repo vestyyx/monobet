@@ -127,7 +127,7 @@ export function MarketForm({
               maxBetCents: maxBet.trim() === "" ? null : Math.round(parseFloat(maxBet) * 100),
             });
             if (r.ok) {
-              toast.success(t.live);
+              toast.success(r.live === false ? t.sentForApproval : t.live);
               router.push(`/market/${r.slug}`);
             } else toast.error(t.serverErr(r.error));
           });

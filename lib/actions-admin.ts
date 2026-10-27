@@ -13,13 +13,15 @@
 //   transfer user → another user  kind "transfer" (two legs)
 //   reverse  counter-entry for an earlier admin row, original stays visible
 // plus bulkGrant (preview→confirm→undo) and freeze/unfreeze.
-import { randomUUID } from "crypto";
+import { randomUUID, randomInt } from "crypto";
 import { revalidatePath } from "next/cache";
 import { db, schema } from "@/lib/db";
 import { and, eq, sql } from "drizzle-orm";
-import { assertRole, rankOf, type Role } from "@/lib/admin/rbac";
+import { assertRole, rankOf, parseRole, type Role } from "@/lib/admin/rbac";
+import { SUPER_ADMIN_EMAIL } from "@/lib/auth";
 import { audit } from "@/lib/audit";
-import { credit, lockUser, type Tx } from "@/lib/tx-market";
+import { credit, lockUser, lockMarket, type Tx } from "@/lib/tx-market";
+import { marketYesPrice } from "@/lib/queries";
 import {
   moneyDeltaWithinCap,
   moneyKindFor,
@@ -34,6 +36,13 @@ import {
   MONEY_BULK_MAX_TARGETS,
   type MoneyOp,
 } from "@/lib/admin-money";
+import {
+  banDaysOk,
+  banReasonOk,
+  inviteCodeFromIndexes,
+  INVITE_CODE_LEN,
+  roleChangeAllowed,
+} from "@/lib/admin-users";
 
 export type AdjustResult = { ok: boolean; error?: string; deduped?: boolean };
 export type BulkResult = { ok: boolean; error?: string; batchId?: string; count?: number; totalCents?: number };
@@ -359,5 +368,385 @@ export async function bulkUndo(input: { batchId: string; reason: string }): Prom
     return { ok: true, count };
   } catch (e) {
     return fail(e, "Bulk undo failed");
+  }
+}
+
+// ============================================================
+// Phase 3 — players (roles, bans, limits), squads, approvals
+// Every action here is audited and role-guarded; the pure rules
+// live in lib/admin-users.ts.
+// ============================================================
+
+/** Small random sampler for the shared invite alphabet (32 chars). */
+function newInviteCode(): string {
+  const idx: number[] = [];
+  for (let i = 0; i < INVITE_CODE_LEN; i++) idx.push(randomInt(0, 32));
+  return inviteCodeFromIndexes(idx);
+}
+
+/**
+ * Locks a player row and enforces the ladder guard: admins may only act on
+ * players strictly below their own rank, and the owner account (super-admin
+ * email) is untouchable — just like assertManageableUser in actions.ts, but
+ * transactional and returning the locked row.
+ */
+async function lockManageableTarget(
+  tx: Tx,
+  admin: { id: string; username: string | null; parsedRole: Role },
+  userId: string
+) {
+  if (userId === admin.id) throw new Error("Can't do this to your own account");
+  const [target] = await tx.select().from(schema.user).where(eq(schema.user.id, userId)).limit(1).for("update");
+  if (!target) throw new Error("Player not found");
+  if ((target.email ?? "").toLowerCase() === SUPER_ADMIN_EMAIL) throw new Error("The owner account can't be modified");
+  const targetRole = parseRole(target.role);
+  if (targetRole === "owner" || rankOf(targetRole) >= rankOf(admin.parsedRole))
+    throw new Error("That player holds an equal or higher rank than you");
+  return target;
+}
+
+export type Phase3Result = { ok: boolean; error?: string };
+
+// ---------- role changes (rules: admin sets user ↔ moderator, owner handles admins) ----------
+
+export async function adminSetRole(input: { userId: string; role: "user" | "moderator" | "admin" }): Promise<Phase3Result> {
+  try {
+    const admin = await assertRole("moderator");
+
+    await db.transaction(async (tx) => {
+      const target = await lockManageableTarget(tx, admin, input.userId);
+      const verdict = roleChangeAllowed(admin.parsedRole, parseRole(target.role), input.role);
+      if (verdict !== "ok") throw new Error("You can't assign that role to this player");
+      await tx.update(schema.user).set({ role: input.role }).where(eq(schema.user.id, input.userId));
+      await audit(
+        tx,
+        admin.id,
+        admin.username ?? "?",
+        "user.role",
+        "user",
+        input.userId,
+        "Role change",
+        { role: target.role },
+        { role: input.role }
+      );
+    });
+    revalidatePath("/admin/players");
+    revalidatePath(`/admin/players/${input.userId}`);
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "Role change failed");
+  }
+}
+
+// ---------- bans ----------
+
+/** Temp ban with expiry (days). Sessions are dropped so it bites immediately. */
+export async function adminTempBan(input: { userId: string; days: number; reason: string }): Promise<Phase3Result> {
+  try {
+    const admin = await assertRole("moderator");
+    const reason = (input.reason ?? "").trim();
+    if (!banReasonOk(reason)) throw new Error("Reason is required (at least 5 characters)");
+    if (!banDaysOk(input.days)) throw new Error("Ban length must be 1–365 days");
+
+    const until = new Date(Date.now() + input.days * 24 * 60 * 60 * 1000);
+    await db.transaction(async (tx) => {
+      const target = await lockManageableTarget(tx, admin, input.userId);
+      await tx
+        .update(schema.user)
+        .set({ bannedAt: new Date(), bannedUntil: until, banReason: reason })
+        .where(eq(schema.user.id, input.userId));
+      await tx.delete(schema.session).where(eq(schema.session.userId, input.userId)); // kick live sessions now
+      await audit(
+        tx,
+        admin.id,
+        admin.username ?? "?",
+        "user.ban",
+        "user",
+        input.userId,
+        reason,
+        { bannedAt: target.bannedAt?.toISOString() ?? null, bannedUntil: target.bannedUntil?.toISOString() ?? null },
+        { days: input.days, bannedUntil: until.toISOString() }
+      );
+    });
+    revalidatePath("/admin/players");
+    revalidatePath(`/admin/players/${input.userId}`);
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "Ban failed");
+  }
+}
+
+/** Lifts any ban (temp or permanent). Idempotent. */
+export async function adminUnban(input: { userId: string; reason: string }): Promise<Phase3Result> {
+  try {
+    const admin = await assertRole("moderator");
+    const reason = (input.reason ?? "").trim();
+    if (!banReasonOk(reason)) throw new Error("Reason is required (at least 5 characters)");
+
+    await db.transaction(async (tx) => {
+      const target = await lockManageableTarget(tx, admin, input.userId);
+      await tx
+        .update(schema.user)
+        .set({ bannedAt: null, bannedUntil: null, banReason: null })
+        .where(eq(schema.user.id, input.userId));
+      await audit(
+        tx,
+        admin.id,
+        admin.username ?? "?",
+        "user.unban",
+        "user",
+        input.userId,
+        reason,
+        { bannedAt: target.bannedAt?.toISOString() ?? null, bannedUntil: target.bannedUntil?.toISOString() ?? null },
+        { bannedUntil: null }
+      );
+    });
+    revalidatePath("/admin/players");
+    revalidatePath(`/admin/players/${input.userId}`);
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "Unban failed");
+  }
+}
+
+// ---------- sign-out / player limits ----------
+
+/** Force sign-out everywhere. (Existing sessions are deleted server-side.) */
+export async function adminForceLogout(input: { userId: string; reason: string }): Promise<Phase3Result> {
+  try {
+    const admin = await assertRole("moderator");
+    const reason = (input.reason ?? "").trim();
+    if (!banReasonOk(reason)) throw new Error("Reason is required (at least 5 characters)");
+
+    await db.transaction(async (tx) => {
+      await lockManageableTarget(tx, admin, input.userId);
+      const gone = await tx.delete(schema.session).where(eq(schema.session.userId, input.userId)).returning({ id: schema.session.id });
+      await audit(tx, admin.id, admin.username ?? "?", "user.forceLogout", "user", input.userId, reason, null, {
+        sessionsKilled: gone.length,
+      });
+    });
+    revalidatePath("/admin/players");
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "Sign-out failed");
+  }
+}
+
+/** Kid mode toggle — flips the personal stake cap to Ɱ50. */
+export async function adminSetKidMode(input: { userId: string; on: boolean; reason: string }): Promise<Phase3Result> {
+  try {
+    const admin = await assertRole("moderator");
+    const reason = (input.reason ?? "").trim();
+    if (!banReasonOk(reason)) throw new Error("Reason is required (at least 5 characters)");
+
+    await db.transaction(async (tx) => {
+      const target = await lockManageableTarget(tx, admin, input.userId);
+      await tx.update(schema.user).set({ kidMode: input.on }).where(eq(schema.user.id, input.userId));
+      await audit(tx, admin.id, admin.username ?? "?", "user.kidMode", "user", input.userId, reason, { kidMode: target.kidMode }, { kidMode: input.on });
+    });
+    revalidatePath("/admin/players");
+    revalidatePath(`/admin/players/${input.userId}`);
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "Kid mode failed");
+  }
+}
+
+/**
+ * Personal per-order stake cap in Monys (null = remove the cap; "0" also
+ * removes). Kid mode always applies its own Ɱ50 floor on top of this.
+ */
+export async function adminSetMaxStake(input: {
+  userId: string;
+  monos: number | string | null;
+  reason: string;
+}): Promise<Phase3Result> {
+  try {
+    const admin = await assertRole("moderator");
+    const reason = (input.reason ?? "").trim();
+    if (!banReasonOk(reason)) throw new Error("Reason is required (at least 5 characters)");
+
+    let cents: number | null = null;
+    if (input.monos !== null && input.monos !== undefined && String(input.monos).trim() !== "") {
+      cents = parsePositiveMonos(input.monos);
+      if (cents === null) throw new Error("Enter a positive amount");
+    }
+
+    await db.transaction(async (tx) => {
+      const target = await lockManageableTarget(tx, admin, input.userId);
+      await tx.update(schema.user).set({ maxStakeCents: cents }).where(eq(schema.user.id, input.userId));
+      await audit(
+        tx,
+        admin.id,
+        admin.username ?? "?",
+        "user.maxStake",
+        "user",
+        input.userId,
+        reason,
+        { maxStakeCents: target.maxStakeCents ?? null },
+        { maxStakeCents: cents }
+      );
+    });
+    revalidatePath("/admin/players");
+    revalidatePath(`/admin/players/${input.userId}`);
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "Stake cap failed");
+  }
+}
+
+// ---------- squads ----------
+
+/** Pause/unpause a squad: paused squads refuse joins, invites and sends. */
+export async function adminPauseSquad(input: { squadId: string; pause: boolean; reason: string }): Promise<Phase3Result> {
+  try {
+    const admin = await assertRole("moderator");
+    const reason = (input.reason ?? "").trim();
+    if (!banReasonOk(reason)) throw new Error("Reason is required (at least 5 characters)");
+
+    const now = new Date();
+    await db.transaction(async (tx) => {
+      const [sq] = await tx.select().from(schema.squad).where(eq(schema.squad.id, input.squadId)).limit(1).for("update");
+      if (!sq) throw new Error("Squad not found");
+      await tx.update(schema.squad).set({ pausedAt: input.pause ? now : null }).where(eq(schema.squad.id, input.squadId));
+      await audit(tx, admin.id, admin.username ?? "?", input.pause ? "group.pause" : "group.unpause", "squad", input.squadId, reason, { pausedAt: sq.pausedAt?.toISOString() ?? null }, { pausedAt: input.pause ? now.toISOString() : null });
+    });
+    revalidatePath("/admin/groups");
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "Squad pause failed");
+  }
+}
+
+/** Generate a fresh 6-char code (only meaningful while invites are enabled). */
+export async function adminRotateInviteCode(input: { squadId: string }): Promise<Phase3Result> {
+  try {
+    const admin = await assertRole("moderator");
+    let code = "";
+    await db.transaction(async (tx) => {
+      const [sq] = await tx.select().from(schema.squad).where(eq(schema.squad.id, input.squadId)).limit(1).for("update");
+      if (!sq) throw new Error("Squad not found");
+      // 5 collision attempts is plenty at family scale (32^6 space)
+      for (let attempt = 0; attempt < 5; attempt++) {
+        code = newInviteCode();
+        const clash = await tx.select({ id: schema.squad.id }).from(schema.squad).where(eq(schema.squad.inviteCode, code)).limit(1);
+        if (clash.length === 0) break;
+        if (attempt === 4) throw new Error("Code generator busy — try again");
+      }
+      await tx.update(schema.squad).set({ inviteCode: code, inviteEnabled: true }).where(eq(schema.squad.id, input.squadId));
+      await audit(tx, admin.id, admin.username ?? "?", "group.inviteRotate", "squad", input.squadId, "Invite code regenerated", { inviteCode: sq.inviteCode }, { inviteCode: code });
+    });
+    revalidatePath("/admin/groups");
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "Invite code failed");
+  }
+}
+
+export async function adminSetInviteEnabled(input: { squadId: string; enabled: boolean; reason: string }): Promise<Phase3Result> {
+  try {
+    const admin = await assertRole("moderator");
+    const reason = (input.reason ?? "").trim();
+    if (!banReasonOk(reason)) throw new Error("Reason is required (at least 5 characters)");
+
+    await db.transaction(async (tx) => {
+      const [sq] = await tx.select().from(schema.squad).where(eq(schema.squad.id, input.squadId)).limit(1).for("update");
+      if (!sq) throw new Error("Squad not found");
+      await tx.update(schema.squad).set({ inviteEnabled: input.enabled }).where(eq(schema.squad.id, input.squadId));
+      await audit(tx, admin.id, admin.username ?? "?", "group.inviteToggle", "squad", input.squadId, reason, { inviteEnabled: sq.inviteEnabled }, { inviteEnabled: input.enabled });
+    });
+    revalidatePath("/admin/groups");
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "Invite toggle failed");
+  }
+}
+
+/**
+ * Group Parent promotion/demotion. Members of a squad have user.squadId set;
+ * exactly the flagged ones can kick. Sets one parent per squad (existing
+ * parents are demoted).
+ */
+export async function adminSetSquadParent(input: { squadId: string; userId: string; parent: boolean }): Promise<Phase3Result> {
+  try {
+    const admin = await assertRole("moderator");
+    await db.transaction(async (tx) => {
+      const target = await lockManageableTarget(tx, admin, input.userId);
+      if (target.squadId !== input.squadId) throw new Error("That player is not in this squad");
+      await tx
+        .update(schema.user)
+        .set({ squadRole: null })
+        .where(and(eq(schema.user.squadId, input.squadId), eq(schema.user.squadRole, "parent")));
+      await tx.update(schema.user).set({ squadRole: input.parent ? "parent" : null }).where(eq(schema.user.id, input.userId));
+      await audit(tx, admin.id, admin.username ?? "?", "group.parent", "squad", input.squadId, input.parent ? `Parent: ${target.username}` : `Parent removed: ${target.username}`, { parent: target.squadRole ?? null }, { parent: input.parent ? target.id : null });
+    });
+    revalidatePath("/admin/groups");
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "Parent change failed");
+  }
+}
+
+/** Hand the squad's created-by to another member (admin+; rare rescue op). */
+export async function adminTransferSquad(input: { squadId: string; userId: string }): Promise<Phase3Result> {
+  try {
+    const admin = await assertRole("admin");
+    await db.transaction(async (tx) => {
+      const [sq] = await tx.select().from(schema.squad).where(eq(schema.squad.id, input.squadId)).limit(1).for("update");
+      if (!sq) throw new Error("Squad not found");
+      const target = await lockManageableTarget(tx, admin, input.userId);
+      if (target.squadId !== input.squadId) throw new Error("The new owner must be a member of this squad");
+      await tx.update(schema.squad).set({ createdBy: input.userId }).where(eq(schema.squad.id, input.squadId));
+      await audit(tx, admin.id, admin.username ?? "?", "group.transfer", "squad", input.squadId, `Ownership: ${sq.name}`, { createdBy: sq.createdBy }, { createdBy: input.userId });
+    });
+    revalidatePath("/admin/groups");
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "Squad transfer failed");
+  }
+}
+
+// ---------- approvals queue (user-created markets) ----------
+
+/** Approve a pending player-created market straight to tradeable. */
+export async function approvalApproveMarket(input: { marketId: string; reason: string }): Promise<Phase3Result> {
+  try {
+    const admin = await assertRole("moderator");
+    const reason = (input.reason ?? "").trim();
+    if (!banReasonOk(reason)) throw new Error("Reason is required (at least 5 characters)");
+
+    await db.transaction(async (tx) => {
+      const m = await lockMarket(tx, input.marketId);
+      if (m.status !== "pending") throw new Error("Not pending");
+      await tx.update(schema.market).set({ status: "live" }).where(eq(schema.market.id, input.marketId));
+      await tx.insert(schema.pricePoint).values({ marketId: input.marketId, yesPrice: marketYesPrice(m).toFixed(5) });
+      await audit(tx, admin.id, admin.username ?? "?", "market.approve", "market", input.marketId, reason, { status: "pending" }, { status: "live" });
+    });
+    revalidatePath("/admin/approvals");
+    revalidatePath("/");
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "Approve failed");
+  }
+}
+
+/** Reject with a required reason (shows on the creator's market card). */
+export async function approvalRejectMarket(input: { marketId: string; reason: string }): Promise<Phase3Result> {
+  try {
+    const admin = await assertRole("moderator");
+    const reason = (input.reason ?? "").trim();
+    if (!banReasonOk(reason)) throw new Error("Reason is required (at least 5 characters)");
+
+    await db.transaction(async (tx) => {
+      const m = await lockMarket(tx, input.marketId);
+      if (m.status !== "pending") throw new Error("Not pending");
+      await tx.update(schema.market).set({ status: "rejected" }).where(eq(schema.market.id, input.marketId));
+      await audit(tx, admin.id, admin.username ?? "?", "market.reject", "market", input.marketId, reason, { status: "pending" }, { status: "rejected" });
+    });
+    revalidatePath("/admin/approvals");
+    revalidatePath("/");
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "Reject failed");
   }
 }
