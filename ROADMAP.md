@@ -5,7 +5,7 @@
 > **MonoPredict** — a private, family-and-friends forecasting game. Sunčný, family-friendly, zero gambling.
 > Mony (Ɱ) are play points with no monetary value.
 >
-> Last updated: 2026-10-22 · All verification = `npx tsc --noEmit` + `npm run lint` + `npx vitest run`
+> Last updated: 2026-10-27 · · All verification = `npx tsc --noEmit` + `npm run lint` + `npx vitest run`
 
 ---
 
@@ -30,7 +30,7 @@
 | G3 | Games batch 3: Family Quests + Photo Guess | ✅ done | `51206da` (PR #5) |
 | 2.2 | Player money management + ledger-backed actions + audit log | ✅ done | `1560d53` (PR #6) |
 | 3 | Users, groups, approvals queue | ✅ done | `36075eb` (PR #7) |
-| 4 | Moderation + suspicious activity | ⬜ queued | — |
+| 4 | Moderation + suspicious activity | ✅ done | `9cb48f5` (PR #8) |
 | 5 | Module admin pages (markets, games, gigs) | ⬜ queued | — |
 | 6 | Economy dashboard, config versioning, exports, reconciliation | ⬜ queued | — |
 | 7 | Roles/security hardening, UI polish, tests, 2-min demo path | ⬜ queued | — |
@@ -107,10 +107,10 @@ The core of the spec: **every Mony change goes through the ledger, with a reason
 - [x] Approvals queue: new members + user-created markets/questions/gigs — approve/reject/edit with reason message
 
 ### Phase 4 — Moderation & safety
-- [ ] `report` queue UI (comment/market/photo/user/duel) — assign, resolve, dismiss
-- [ ] Comment/content moderation: hide, delete, warn, shadow-mute; topic blocklist + profanity editor
-- [ ] Photo Guess uploads reviewed before publish
-- [ ] Suspicious activity view (multi-account signals, rapid actions, odd streaks)
+- [x] `report` queue UI (comment/market/photo/user/duel) — assign, resolve, dismiss
+- [x] Comment/content moderation: hide, delete, warn, shadow-mute; topic blocklist + profanity editor
+- [x] Photo Guess uploads reviewed before publish
+- [x] Suspicious activity view (multi-account signals, rapid actions, odd streaks)
 
 ### Phase 5 — Module admin pages
 - [ ] Markets: create/edit/close/resolve/cancel+refund/delete, per-group availability
