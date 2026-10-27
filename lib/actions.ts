@@ -15,6 +15,7 @@ import { accruedDebtCents, LOAN_PRESETS_CENTS, LOAN_OFFER_COUNT, LOAN_OFFER_TTL_
 import { capJobPay, dishesPay, DISH_PAY_CENTS, genMathProblems, JOBS, mathAnswer, mathPay, type Job, type MathProblem } from "@/lib/jobs";
 import { marketYesPrice, getMarketBetCount, getStatsSince } from "@/lib/queries";
 import { personalStakeCapCents } from "@/lib/admin-users";
+import { blocklistMatch, reportKindOk, reportReasonOk } from "@/lib/moderation";
 import { audit } from "@/lib/audit";
 import {
   DAILY_AMOUNT,
@@ -52,8 +53,8 @@ export async function assertNotFrozen(userId: string) {
 
 // Crude spam brakes for a friends group — recent-row counts on the live
 // tables, generous thresholds, no new infra.
-async function assertNotSpam(userId: string, kind: "trade" | "comment" | "loan") {
-  const limits = { trade: 60, comment: 5, loan: 3 };
+async function assertNotSpam(userId: string, kind: "trade" | "comment" | "loan" | "report") {
+  const limits = { trade: 60, comment: 5, loan: 3, report: 10 };
   const max = limits[kind];
   let n = 0;
   if (kind === "comment") {
@@ -68,6 +69,12 @@ async function assertNotSpam(userId: string, kind: "trade" | "comment" | "loan")
       .from(schema.ledger)
       .where(and(eq(schema.ledger.userId, userId), eq(schema.ledger.kind, "loan"), sql`${schema.ledger.createdAt} > now() - interval '1 hour'`));
     n = r?.n ?? 0;
+  } else if (kind === "report") {
+    const [r] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(schema.report)
+      .where(and(eq(schema.report.reporterId, userId), sql`${schema.report.createdAt} > now() - interval '1 hour'`));
+    n = r?.n ?? 0;
   } else {
     const [r] = await db
       .select({ n: sql<number>`count(*)::int` })
@@ -76,6 +83,16 @@ async function assertNotSpam(userId: string, kind: "trade" | "comment" | "loan")
     n = r?.n ?? 0;
   }
   if (n >= max) throw new Error("Too fast — wait a few minutes");
+}
+
+// Phase 4 — loose blocklist screen over the admin-maintained vocabulary.
+// Runs on every comment post/edit and market proposal; the desk curates the
+// list in /admin/moderation.
+async function assertBlocklistOk(text: string) {
+  const patterns = await db.select({ pattern: schema.blocklist.pattern }).from(schema.blocklist).limit(500);
+  if (patterns.length === 0) return;
+  const hit = blocklistMatch(text, patterns.map((p) => p.pattern));
+  if (hit) throw new Error(`House blocklist hit: ${hit}`);
 }
 
 // ---------- helpers ----------
@@ -2305,6 +2322,7 @@ export async function addComment(input: {
     const body = input.body.trim();
     if (!body) throw new Error("Empty comment");
     if (body.length > 1000) throw new Error("Comment too long (max 1000)");
+    await assertBlocklistOk(body);
     const image = input.image ?? null;
     if (image) {
       if (!/^data:image\/(jpeg|png|webp);base64,/.test(image)) throw new Error("Bad image format");
@@ -2343,6 +2361,7 @@ export async function editComment(input: {
     const body = input.body.trim();
     if (!body) throw new Error("Empty comment");
     if (body.length > 1000) throw new Error("Comment too long (max 1000)");
+    await assertBlocklistOk(body);
     const [c] = await db.select().from(schema.comment).where(eq(schema.comment.id, input.commentId)).limit(1);
     if (!c) throw new Error("Not found");
     if (c.userId !== u.id) throw new Error("Not yours");
@@ -2353,6 +2372,37 @@ export async function editComment(input: {
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Edit failed" };
+  }
+}
+
+// Player-side report: any signed-in player can flag a comment (the queue
+// covers market/photo/user/duel too for future hooks). Rate-limited, no
+// audit needed — reports are player data, admin handling is what's audited.
+export async function reportContent(input: {
+  kind: string;
+  targetId: string;
+  reason: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const u = await requireUser();
+    if (!reportKindOk(input.kind)) throw new Error("Unknown report kind");
+    if (!reportReasonOk(input.reason)) throw new Error("Add one sentence — why are you reporting this?");
+    await assertNotSpam(u.id, "report");
+    const [dup] = await db
+      .select({ id: schema.report.id })
+      .from(schema.report)
+      .where(and(eq(schema.report.kind, input.kind), eq(schema.report.targetId, input.targetId), eq(schema.report.reporterId, u.id), eq(schema.report.status, "open")))
+      .limit(1);
+    if (dup) throw new Error("You already reported this");
+    await db.insert(schema.report).values({
+      kind: input.kind,
+      targetId: input.targetId,
+      reporterId: u.id,
+      reason: (input.reason ?? "").trim(),
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Report failed" };
   }
 }
 

@@ -43,6 +43,11 @@ import {
   INVITE_CODE_LEN,
   roleChangeAllowed,
 } from "@/lib/admin-users";
+import {
+  blocklistPatternOk,
+  resolutionNoteOk,
+  warnHoursOk,
+} from "@/lib/moderation";
 
 export type AdjustResult = { ok: boolean; error?: string; deduped?: boolean };
 export type BulkResult = { ok: boolean; error?: string; batchId?: string; count?: number; totalCents?: number };
@@ -684,6 +689,175 @@ export async function adminSetSquadParent(input: { squadId: string; userId: stri
     return { ok: true };
   } catch (e) {
     return fail(e, "Parent change failed");
+  }
+}
+
+// ---------- Phase 4 — moderation (reports, comments, blocklist) ----------
+
+/** Take an open report for yourself (assignee = me). */
+export async function modAssignReport(input: { reportId: string }): Promise<Phase3Result> {
+  try {
+    const admin = await assertRole("moderator");
+    await db.transaction(async (tx) => {
+      const [r] = await tx.select().from(schema.report).where(eq(schema.report.id, input.reportId)).limit(1).for("update");
+      if (!r) throw new Error("Report not found");
+      if (r.status !== "open") throw new Error("Only open reports can be assigned");
+      await tx.update(schema.report).set({ assigneeId: admin.id }).where(eq(schema.report.id, input.reportId));
+      await audit(tx, admin.id, admin.username ?? "?", "report.assign", "report", input.reportId, `Case taken (${r.kind})`, { assignee: r.assigneeId ?? null }, { assignee: admin.id });
+    });
+    revalidatePath("/admin/moderation");
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "Assign failed");
+  }
+}
+
+/** Close the case as handled (action was taken elsewhere: hide/ban/…). */
+export async function modResolveReport(input: { reportId: string; note: string }): Promise<Phase3Result> {
+  try {
+    const admin = await assertRole("moderator");
+    const note = (input.note ?? "").trim();
+    if (!resolutionNoteOk(note)) throw new Error("Resolution note is required (at least 5 characters)");
+    await db.transaction(async (tx) => {
+      const [r] = await tx.select().from(schema.report).where(eq(schema.report.id, input.reportId)).limit(1).for("update");
+      if (!r) throw new Error("Report not found");
+      if (r.status !== "open") throw new Error("Only open reports can be resolved");
+      await tx
+        .update(schema.report)
+        .set({ status: "resolved", resolvedAt: new Date(), assigneeId: r.assigneeId ?? admin.id, resolutionNote: note })
+        .where(eq(schema.report.id, input.reportId));
+      await audit(tx, admin.id, admin.username ?? "?", "report.resolve", "report", input.reportId, note, { status: "open", kind: r.kind }, { status: "resolved" });
+    });
+    revalidatePath("/admin/moderation");
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "Resolve failed");
+  }
+}
+
+/** Close the case as not-a-worthy-action (with the reason on record). */
+export async function modDismissReport(input: { reportId: string; note: string }): Promise<Phase3Result> {
+  try {
+    const admin = await assertRole("moderator");
+    const note = (input.note ?? "").trim();
+    if (!resolutionNoteOk(note)) throw new Error("Dismiss note is required (at least 5 characters)");
+    await db.transaction(async (tx) => {
+      const [r] = await tx.select().from(schema.report).where(eq(schema.report.id, input.reportId)).limit(1).for("update");
+      if (!r) throw new Error("Report not found");
+      if (r.status !== "open") throw new Error("Only open reports can be dismissed");
+      await tx
+        .update(schema.report)
+        .set({ status: "dismissed", resolvedAt: new Date(), assigneeId: r.assigneeId ?? admin.id, resolutionNote: note })
+        .where(eq(schema.report.id, input.reportId));
+      await audit(tx, admin.id, admin.username ?? "?", "report.dismiss", "report", input.reportId, note, { status: "open", kind: r.kind }, { status: "dismissed" });
+    });
+    revalidatePath("/admin/moderation");
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "Dismiss failed");
+  }
+}
+
+/** Censor/un-censor a comment (body stays stored, UI masks it). */
+export async function modHideComment(input: { commentId: string; hidden: boolean; reason: string }): Promise<Phase3Result> {
+  try {
+    const admin = await assertRole("moderator");
+    let reason = (input.reason ?? "").trim();
+    // censor needs the why on record; un-hiding does not. The quick button on
+    // the market page censors without an inline note — fall back to a plain one.
+    if (input.hidden && !banReasonOk(reason)) reason = "Hidden by a moderator";
+    await db.transaction(async (tx) => {
+      const [c] = await tx.select().from(schema.comment).where(eq(schema.comment.id, input.commentId)).limit(1);
+      if (!c) throw new Error("Comment not found");
+      if (c.hidden === input.hidden) throw new Error("Already in that state");
+      await tx.update(schema.comment).set({ hidden: input.hidden }).where(eq(schema.comment.id, input.commentId));
+      const [m] = await tx.select({ slug: schema.market.slug }).from(schema.market).where(eq(schema.market.id, c.marketId)).limit(1);
+      if (m) revalidatePath(`/market/${m.slug}`);
+      await audit(tx, admin.id, admin.username ?? "?", input.hidden ? "comment.hide" : "comment.unhide", "comment", input.commentId, input.hidden ? reason : "Comment shown again", { hidden: c.hidden }, { hidden: input.hidden });
+    });
+    revalidatePath("/admin/moderation");
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "Comment hide failed");
+  }
+}
+
+/** Comment timeout (warn): the author can't post for N hours. */
+export async function modWarnPlayer(input: { userId: string; hours: number; reason: string }): Promise<Phase3Result> {
+  try {
+    const admin = await assertRole("moderator");
+    const reason = (input.reason ?? "").trim();
+    if (!banReasonOk(reason)) throw new Error("Reason is required (at least 5 characters)");
+    const hours = Math.round(input.hours);
+    if (!warnHoursOk(hours)) throw new Error("Hours must be 1–720");
+    await db.transaction(async (tx) => {
+      const target = await lockManageableTarget(tx, admin, input.userId);
+      const until = new Date(Date.now() + hours * 3600_000);
+      await tx.update(schema.user).set({ commentBanUntil: until }).where(eq(schema.user.id, input.userId));
+      await audit(tx, admin.id, admin.username ?? "?", "comment.timeout", "user", input.userId, reason, { commentBanUntil: target.commentBanUntil }, { commentBanUntil: until, hours });
+    });
+    revalidatePath("/admin/moderation");
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "Warn failed");
+  }
+}
+
+/** Permanent comment ban (mute) / lift it. */
+export async function modMutePlayer(input: { userId: string; muted: boolean; reason: string }): Promise<Phase3Result> {
+  try {
+    const admin = await assertRole("moderator");
+    const reason = (input.reason ?? "").trim();
+    if (input.muted && !banReasonOk(reason)) throw new Error("Reason is required (at least 5 characters)");
+    await db.transaction(async (tx) => {
+      const target = await lockManageableTarget(tx, admin, input.userId);
+      if ((target.commentsBanned ?? false) === input.muted) throw new Error("Already in that state");
+      await tx.update(schema.user).set({ commentsBanned: input.muted }).where(eq(schema.user.id, input.userId));
+      await audit(tx, admin.id, admin.username ?? "?", input.muted ? "user.mute" : "user.unmute", "user", input.userId, input.muted ? reason : "Comments enabled again", { commentsBanned: target.commentsBanned ?? false }, { commentsBanned: input.muted });
+    });
+    revalidatePath("/admin/moderation");
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "Mute failed");
+  }
+}
+
+// ---------- blocklist editor (admin+ — it shapes everyone's vocabulary) ----------
+
+/** Add one pattern (loose matching happens at write time in actions.ts). */
+export async function modAddBlockPattern(input: { pattern: string }): Promise<Phase3Result> {
+  try {
+    const admin = await assertRole("admin");
+    const pattern = (input.pattern ?? "").trim();
+    if (!blocklistPatternOk(pattern)) throw new Error("Pattern must be 2–40 characters");
+    await db.transaction(async (tx) => {
+      const [dupe] = await tx.select({ id: schema.blocklist.id }).from(schema.blocklist).where(eq(schema.blocklist.pattern, pattern)).limit(1);
+      if (dupe) throw new Error("Already on the list");
+      await tx.insert(schema.blocklist).values({ pattern, addedBy: admin.username ?? "?" });
+      await audit(tx, admin.id, admin.username ?? "?", "blocklist.add", "blocklist", pattern, pattern, null, { addedBy: admin.username ?? "?" });
+    });
+    revalidatePath("/admin/moderation");
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "Add failed");
+  }
+}
+
+export async function modRemoveBlockPattern(input: { id: string; reason: string }): Promise<Phase3Result> {
+  try {
+    const admin = await assertRole("admin");
+    const reason = (input.reason ?? "").trim();
+    if (!banReasonOk(reason)) throw new Error("Reason is required (at least 5 characters)");
+    await db.transaction(async (tx) => {
+      const [row] = await tx.select().from(schema.blocklist).where(eq(schema.blocklist.id, input.id)).limit(1);
+      if (!row) throw new Error("Pattern not found");
+      await tx.delete(schema.blocklist).where(eq(schema.blocklist.id, input.id));
+      await audit(tx, admin.id, admin.username ?? "?", "blocklist.remove", "blocklist", row.pattern, reason, { pattern: row.pattern }, null);
+    });
+    revalidatePath("/admin/moderation");
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "Remove failed");
   }
 }
 

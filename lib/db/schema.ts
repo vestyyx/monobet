@@ -602,6 +602,20 @@ export const configVersion = pgTable("config_version", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Blocklist (Phase 4 moderation) — topic/profanity patterns the comment desk
+// maintains. Matching happens loosely in code (diacritics + leet folded), the
+// row stays human-editable. Rejected list grows by admin decision, never auto.
+export const blocklist = pgTable(
+  "blocklist",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    pattern: text("pattern").notNull().unique(),
+    addedBy: text("added_by").notNull().default(""), // admin username (display only)
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("blocklist_created_idx").on(t.createdAt)]
+);
+
 // Player restriction columns live on the user table above (Phase 1 groundwork
 // for money freeze + kid mode): frozenAt freezes balance ops; kidMode shrinks
 // limits; maxStakeCents overrides the platform stake cap for that player.

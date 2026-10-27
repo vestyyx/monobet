@@ -145,7 +145,7 @@ export const ADMIN_MODULES: AdminModuleDef[] = [
     descCs: "Fronta nahlášených, skrytí obsahu, varování, bloklisty, podezřelá aktivita.",
     icon: ShieldAlert,
     minRole: "moderator",
-    built: false,
+    built: true,
     deliveryPhase: "Phase 4",
     group: "safety",
   },

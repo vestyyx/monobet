@@ -4,20 +4,23 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Avatar, Button, Textarea } from "@/components/ui/primitives";
+import { Avatar, Button, Input, Textarea } from "@/components/ui/primitives";
 import {
   addComment,
   deleteComment,
   editComment,
   voteComment,
-  adminSetCommentHidden,
-  adminTimeoutComments,
-  adminSetCommentsBanned,
+  reportContent,
 } from "@/lib/actions";
+import {
+  modHideComment,
+  modWarnPlayer,
+  modMutePlayer,
+} from "@/lib/actions-admin";
 import { timeAgo, fmtShares } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { getT, type Lang } from "@/lib/i18n";
-import { Ban, Eye, EyeOff, ImagePlus, Pencil, Reply, ThumbsDown, ThumbsUp, TimerOff, Trash2, X } from "lucide-react";
+import { Ban, Eye, EyeOff, Flag, ImagePlus, Pencil, Reply, ThumbsDown, ThumbsUp, TimerOff, Trash2, X } from "lucide-react";
 
 export type CommentRow = {
   id: string;
@@ -274,6 +277,8 @@ function CommentItem({
   const [replyText, setReplyText] = useState("");
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(c.body);
+  const [reporting, setReporting] = useState(false);
+  const [reportText, setReportText] = useState("");
 
   return (
     <div className="flex gap-3 group anim-rise">
@@ -317,7 +322,7 @@ function CommentItem({
                   title={c.hidden ? t.uncensorComment : t.censorComment}
                   onClick={() =>
                     start(async () => {
-                      const r = await adminSetCommentHidden({ commentId: c.id, hidden: !c.hidden });
+                      const r = await modHideComment({ commentId: c.id, hidden: !c.hidden, reason: "" });
                       if (r.ok) {
                         toast.success(c.hidden ? t.commentShownToast : t.commentCensoredToast);
                         refresh();
@@ -333,7 +338,7 @@ function CommentItem({
                   title={t.timeoutCommenter}
                   onClick={() =>
                     start(async () => {
-                      const r = await adminTimeoutComments({ userId: c.userId, hours: 24 });
+                      const r = await modWarnPlayer({ userId: c.userId, hours: 24, reason: "24h comment timeout from the comment desk" });
                       if (r.ok) toast.success(t.commentMutedToast);
                       else toast.error(t.serverErr(r.error));
                     })
@@ -347,7 +352,7 @@ function CommentItem({
                   title={t.banCommenter}
                   onClick={() =>
                     start(async () => {
-                      const r = await adminSetCommentsBanned({ userId: c.userId, banned: true });
+                      const r = await modMutePlayer({ userId: c.userId, muted: true, reason: "Comments disabled by a moderator" });
                       if (r.ok) toast.success(t.commentBlockedToast);
                       else toast.error(t.serverErr(r.error));
                     })
@@ -370,6 +375,16 @@ function CommentItem({
                 aria-label={t.deleteComment}
               >
                 <Trash2 className="size-3.5" />
+              </button>
+            )}
+            {signedIn && currentUserId !== c.userId && (
+              <button
+                className="text-faint hover:text-no cursor-pointer p-0.5"
+                onClick={() => setReporting((v) => !v)}
+                aria-label={t.reportComment}
+                title={t.reportComment}
+              >
+                <Flag className="size-3.5" />
               </button>
             )}
           </span>
@@ -419,6 +434,35 @@ function CommentItem({
           />
         )}
         <div className="mt-1.5 flex items-center gap-3">
+          {reporting && (
+            <form
+              className="flex items-center gap-2 min-w-0"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!reportText.trim()) return;
+                start(async () => {
+                  const r = await reportContent({ kind: "comment", targetId: c.id, reason: reportText });
+                  if (r.ok) {
+                    toast.success(t.reportSentToast);
+                    setReporting(false);
+                    setReportText("");
+                  } else toast.error(t.serverErr(r.error));
+                });
+              }}
+            >
+              <Input
+                value={reportText}
+                onChange={(e) => setReportText(e.target.value)}
+                placeholder={t.reportReasonPh}
+                maxLength={500}
+                className="h-7 text-[12px] w-[240px]"
+                autoFocus
+              />
+              <Button size="xs" disabled={pending || !reportText.trim()}>
+                {t.reportSend}
+              </Button>
+            </form>
+          )}
           {([1, -1] as const).map((v) => {
             const Icon = v === 1 ? ThumbsUp : ThumbsDown;
             const active = c.myVote === v;
