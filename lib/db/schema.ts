@@ -418,10 +418,24 @@ export const jobShift = pgTable(
     startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
     settledAt: timestamp("settled_at", { withTimezone: true }),
     earnedCents: integer("earned_cents").notNull().default(0),
+    // Phase 5 gigs desk — stamped when a shift payout is clawed back, so a
+    // reversal happens at most once and the desk can show it.
+    reversedAt: timestamp("reversed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("job_shift_user_idx").on(t.userId, t.createdAt)]
 );
+
+// Gig config (Phase 5) — singleton row the gigs desk edits: pay-per-shift
+// rates and the rolling 24 h earnings cap applied to every job payout.
+export const gigConfig = pgTable("gig_config", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  dishPayCents: integer("dish_pay_cents").notNull().default(300),
+  mathPayCents: integer("math_pay_cents").notNull().default(500),
+  dailyCapCents: integer("daily_cap_cents").notNull().default(50_000),
+  updatedBy: text("updated_by").notNull().default(""),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 // ---------- squads ----------
 

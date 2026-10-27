@@ -6,7 +6,7 @@ import { getLang } from "@/lib/lang-server";
 import { getT } from "@/lib/i18n";
 import { Card, Badge } from "@/components/ui/primitives";
 import { fmtMonos, fmtDateTime } from "@/lib/money";
-import { ShieldCheck, Activity, Users, Wallet, Sprout, Zap, Swords, Inbox, ShieldAlert, ArrowRight } from "lucide-react";
+import { ShieldCheck, Activity, Users, Wallet, Sprout, Zap, Swords, Inbox, ShieldAlert } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Administrace" };
@@ -44,17 +44,19 @@ export default async function AdminDashboard() {
       {(d.pendingMarkets > 0 || d.disputedDuels > 0 || d.reportsOpen > 0) && (
         <div className="mt-4 flex flex-wrap gap-2">
           {d.pendingMarkets > 0 && (
-            <Link href="/admin/overview">
+            <Link href="/admin/approvals">
               <Badge tone="warn" className="cursor-pointer">{t.admWarnPending(d.pendingMarkets)}</Badge>
             </Link>
           )}
           {d.disputedDuels > 0 && (
-            <Link href="/admin/overview">
+            <Link href="/admin/moderation">
               <Badge tone="warn" className="cursor-pointer">{t.admWarnDisputes(d.disputedDuels)}</Badge>
             </Link>
           )}
           {d.reportsOpen > 0 && (
-            <Badge tone="no">{t.admWarnReports(d.reportsOpen)}</Badge>
+            <Link href="/admin/moderation">
+              <Badge tone="no" className="cursor-pointer">{t.admWarnReports(d.reportsOpen)}</Badge>
+            </Link>
           )}
         </div>
       )}
@@ -97,18 +99,6 @@ export default async function AdminDashboard() {
           </div>
         )}
       </Card>
-
-      {/* Deep sections arrive phase by phase; the legacy stacked page keeps
-          every existing tool reachable until each is migrated. */}
-      <div className="mt-7 rounded-xl border border-line bg-surface-2 px-4 py-3.5 flex items-center gap-3 flex-wrap">
-        <div className="flex-1 min-w-64">
-          <div className="text-[13px] font-semibold">{t.admLegacyTitle}</div>
-          <p className="text-[12px] text-mute mt-0.5">{t.admLegacyNote}</p>
-        </div>
-        <Link href="/admin/overview" className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-[12.5px] font-semibold text-brand-on hover:bg-brand-strong transition-colors">
-          {t.admLegacyOpen} <ArrowRight className="size-3.5" />
-        </Link>
-      </div>
     </div>
   );
 }

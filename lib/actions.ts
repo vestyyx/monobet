@@ -12,7 +12,18 @@ import { loanFor, liquidationValueCents, groupLiquidationValueCents, shouldLiqui
 import { toNum, credit, lockUser, lockMarket, checkLiquidations, checkGroupLiquidations, garnishDebt, runStops, runGroupStops, addDebt, ping, sweepDebt, type Tx } from "@/lib/tx-market";
 import { resetEconomyTx } from "@/lib/economy-reset";
 import { accruedDebtCents, LOAN_PRESETS_CENTS, LOAN_OFFER_COUNT, LOAN_OFFER_TTL_MS, rollRateBps } from "@/lib/loans";
-import { capJobPay, dishesPay, DISH_PAY_CENTS, genMathProblems, JOBS, mathAnswer, mathPay, type Job, type MathProblem } from "@/lib/jobs";
+import {
+  capJobPay,
+  dishesPay,
+  DEFAULT_JOB_RATES,
+  genMathProblems,
+  JOBS,
+  mathAnswer,
+  mathPay,
+  type Job,
+  type JobRates,
+  type MathProblem,
+} from "@/lib/jobs";
 import { marketYesPrice, getMarketBetCount, getStatsSince } from "@/lib/queries";
 import { personalStakeCapCents } from "@/lib/admin-users";
 import { blocklistMatch, reportKindOk, reportReasonOk } from "@/lib/moderation";
@@ -2575,6 +2586,12 @@ export async function finishJobShift(input: {
       if (!shift) throw new Error("Bad job token");
       await lockUser(tx, u.id);
 
+      // Admin-tuned rates (singleton gig_config row; falls back to defaults).
+      const [cfgRow] = await tx.select().from(schema.gigConfig).limit(1);
+      const rates: JobRates = cfgRow
+        ? { dishPayCents: cfgRow.dishPayCents, mathPayCents: cfgRow.mathPayCents, dailyCapCents: cfgRow.dailyCapCents }
+        : DEFAULT_JOB_RATES;
+
       const elapsedMs = finishedAt - shift.startedAt.getTime();
       const problems = shift.payload ?? [];
       const answers = (Array.isArray(input.answers) ? input.answers : [])
@@ -2585,9 +2602,9 @@ export async function finishJobShift(input: {
         : undefined;
       const grossCents =
         shift.job === "dishes"
-          ? dishesPay(input.plates ?? 0, elapsedMs)
+          ? dishesPay(input.plates ?? 0, elapsedMs, rates)
           : shift.job === "math"
-            ? mathPay(problems, answers, elapsedMs)
+            ? mathPay(problems, answers, elapsedMs, rates)
             : 0;
       const [earned] = await tx
         .select({ cents: sql<number>`coalesce(sum(${schema.ledger.amountCents}), 0)::bigint` })
@@ -2599,12 +2616,14 @@ export async function finishJobShift(input: {
             gte(schema.ledger.createdAt, new Date(finishedAt - 24 * 60 * 60_000))
           )
         );
-      const earnedCents = capJobPay(grossCents, Number(earned?.cents ?? 0));
+      const earnedCents = capJobPay(grossCents, Number(earned?.cents ?? 0), rates.dailyCapCents);
       await tx.update(schema.jobShift).set({ earnedCents }).where(eq(schema.jobShift.id, shift.id));
       if (earnedCents > 0) {
         const memo =
           shift.job === "dishes"
-            ? `Brigáda: mytí nádobí · ${Math.floor(grossCents / DISH_PAY_CENTS)} talířů`
+            ? rates.dishPayCents > 0
+              ? `Brigáda: mytí nádobí · ${Math.floor(grossCents / rates.dishPayCents)} talířů`
+              : "Brigáda: mytí nádobí"
             : `Brigáda: doučování · ${correct ?? 0}/${problems.length}`;
         await credit(tx, u.id, earnedCents, "job", null, memo);
       }

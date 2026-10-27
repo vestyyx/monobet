@@ -5,7 +5,8 @@ import { getLang } from "@/lib/lang-server";
 import { getT } from "@/lib/i18n";
 import { db, schema } from "@/lib/db";
 import { AdminPlayersPanel, type AdminUserRow } from "@/components/admin/user-panels";
-import { Button, Input, Select } from "@/components/ui/primitives";
+import { UsersPanel } from "@/components/admin-panels";
+import { Button, Input, Select, Card } from "@/components/ui/primitives";
 
 export const dynamic = "force-dynamic";
 
@@ -102,6 +103,15 @@ export default async function AdminPlayersPage({
       </form>
 
       <AdminPlayersPanel lang={lang} players={users} />
+
+      {/* create an account (admin+) — migrated from the legacy overview */}
+      <Card className="mt-8 max-w-xl">
+        <div className="px-4 pt-4 pb-1">
+          <h2 className="text-[15px] font-semibold">{t.admPlayersCreateTitle}</h2>
+          <p className="text-[12px] text-mute mt-0.5">{t.admPlayersCreateSub}</p>
+        </div>
+        <UsersPanel lang={lang} />
+      </Card>
     </div>
   );
 }

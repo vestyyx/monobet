@@ -16,7 +16,7 @@
 import { randomUUID, randomInt } from "crypto";
 import { revalidatePath } from "next/cache";
 import { db, schema } from "@/lib/db";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, isNotNull, sql } from "drizzle-orm";
 import { assertRole, rankOf, parseRole, type Role } from "@/lib/admin/rbac";
 import { SUPER_ADMIN_EMAIL } from "@/lib/auth";
 import { audit } from "@/lib/audit";
@@ -48,6 +48,19 @@ import {
   resolutionNoteOk,
   warnHoursOk,
 } from "@/lib/moderation";
+import {
+  jobRatesOk,
+} from "@/lib/jobs";
+
+// Phase 5 — audited desks wrap the player-side market/duel ops (their money
+// legs are already single-transaction; see the section comment below).
+import {
+  adminSettleDuel,
+  cancelMarket,
+  deleteMarket,
+  proposeMarket,
+  resolveMarket,
+} from "@/lib/actions";
 
 export type AdjustResult = { ok: boolean; error?: string; deduped?: boolean };
 export type BulkResult = { ok: boolean; error?: string; batchId?: string; count?: number; totalCents?: number };
@@ -922,5 +935,208 @@ export async function approvalRejectMarket(input: { marketId: string; reason: st
     return { ok: true };
   } catch (e) {
     return fail(e, "Reject failed");
+  }
+}
+
+// ---------- Phase 5 — markets desk (audited wrappers over the market ops) ----------
+//
+// The underlying operations (propose/resolve/cancel-refund/delete) already run
+// their money leg through one transaction in lib/actions.ts; these wrappers
+// add the lord's record: who settled what and why, written right after the
+// op succeeds so a refused action never leaves a phantom audit row.
+
+const MARKET_MIN_REASON = 5;
+
+function marketReasonOk(reason: string): boolean {
+  return (reason ?? "").trim().length >= MARKET_MIN_REASON && (reason ?? "").trim().length <= 500;
+}
+
+/**
+ * Create-or-publish a market from the desk (admins publish instantly).
+ * Currently unused on purpose: the desk reuses the full MarketForm, which
+ * calls proposeMarket directly (admin creation stays unaudited legacy, like
+ * CategoriesPanel). Kept here audited and ready for when the desk gets a
+ * native creation form.
+ */
+export async function adminCreateMarket(
+  input: Parameters<typeof proposeMarket>[0] & { reason?: string }
+): Promise<{ ok: boolean; error?: string; slug?: string }> {
+  try {
+    const admin = await assertRole("admin");
+    const r = await proposeMarket(input);
+    if (!r.ok || !r.slug) return r;
+    await db.transaction(async (tx) => {
+      await audit(tx, admin.id, admin.username ?? "?", "market.create", "market", r.slug!, (input.reason ?? "").trim() || input.question.trim(), null, { slug: r.slug });
+    });
+    revalidatePath("/admin/markets");
+    return r;
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Create failed" };
+  }
+}
+
+/** Settle a live market (binary option or one group option). */
+export async function adminResolveMarket(input: { marketId: string; outcome: "yes" | "no"; reason: string }): Promise<Phase3Result> {
+  try {
+    const admin = await assertRole("admin");
+    if (input.outcome !== "yes" && input.outcome !== "no") throw new Error("Bad outcome");
+    const reason = (input.reason ?? "").trim();
+    if (!marketReasonOk(reason)) throw new Error(`Reason is required (at least ${MARKET_MIN_REASON} characters)`);
+    const m = await db.transaction(async (tx) => {
+      const [row] = await tx.select().from(schema.market).where(eq(schema.market.id, input.marketId)).limit(1);
+      return row ?? null;
+    });
+    if (!m) throw new Error("Market not found");
+    const r = await resolveMarket({ marketId: input.marketId, outcome: input.outcome });
+    if (!r.ok) return fail(new Error(r.error), "Resolve failed");
+    await db.transaction(async (tx) => {
+      await audit(tx, admin.id, admin.username ?? "?", "market.resolve", "market", input.marketId, reason, { status: "live" }, { status: "resolved", outcome: input.outcome, paidOut: r.paidOut ?? 0 });
+    });
+    revalidatePath("/admin/markets");
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "Resolve failed");
+  }
+}
+
+/** Cancel with position refunds at mark. */
+export async function adminCancelMarket(input: { marketId: string; reason: string }): Promise<Phase3Result> {
+  try {
+    const admin = await assertRole("admin");
+    const reason = (input.reason ?? "").trim();
+    if (!marketReasonOk(reason)) throw new Error(`Reason is required (at least ${MARKET_MIN_REASON} characters)`);
+    const r = await cancelMarket(input.marketId);
+    if (!r.ok) return fail(new Error(r.error), "Cancel failed");
+    await db.transaction(async (tx) => {
+      await audit(tx, admin.id, admin.username ?? "?", "market.cancel", "market", input.marketId, reason, { status: "live" }, { status: "cancelled" });
+    });
+    revalidatePath("/admin/markets");
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "Cancel failed");
+  }
+}
+
+/** Admin nuke (options included) — open positions refund at mark first. */
+export async function adminDeleteMarket(input: { marketId: string; reason: string }): Promise<Phase3Result> {
+  try {
+    const admin = await assertRole("admin");
+    const reason = (input.reason ?? "").trim();
+    if (!marketReasonOk(reason)) throw new Error(`Reason is required (at least ${MARKET_MIN_REASON} characters)`);
+    const r = await deleteMarket(input.marketId);
+    if (!r.ok) return fail(new Error(r.error), "Delete failed");
+    await db.transaction(async (tx) => {
+      await audit(tx, admin.id, admin.username ?? "?", "market.delete", "market", input.marketId, reason, { status: "?" }, { status: "deleted" });
+    });
+    revalidatePath("/admin/markets");
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "Delete failed");
+  }
+}
+
+/** Settle a disputed duel — winner takes the pot, or refund both players. */
+export async function adminSettleDispute(input: { duelId: string; winnerId: string | null; reason: string }): Promise<Phase3Result> {
+  try {
+    const admin = await assertRole("admin");
+    const reason = (input.reason ?? "").trim();
+    if (!marketReasonOk(reason)) throw new Error(`Reason is required (at least ${MARKET_MIN_REASON} characters)`);
+    const r = await adminSettleDuel({ id: input.duelId, winnerId: input.winnerId });
+    if (!r.ok) return fail(new Error(r.error), "Settle failed");
+    await db.transaction(async (tx) => {
+      await audit(tx, admin.id, admin.username ?? "?", "duel.settle", "duel", input.duelId, reason, { status: "disputed" }, { status: "settled", winner: input.winnerId ?? "refund-both" });
+    });
+    revalidatePath("/admin/moderation");
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "Settle failed");
+  }
+}
+
+// ---------- Phase 5 — gigs desk (config + shift reversal) ----------
+
+/** Update the singleton gig rates — every payout recalculates with them. */
+export async function gigSetConfig(input: {
+  dishPayCents: number;
+  mathPayCents: number;
+  dailyCapCents: number;
+  reason: string;
+}): Promise<Phase3Result> {
+  try {
+    const admin = await assertRole("admin");
+    const rates = { dishPayCents: Math.round(input.dishPayCents), mathPayCents: Math.round(input.mathPayCents), dailyCapCents: Math.round(input.dailyCapCents) };
+    if (!jobRatesOk(rates)) throw new Error("Rates out of bounds (pays 1–50 Ɱ, cap 100–10 000 Ɱ)");
+    const reason = (input.reason ?? "").trim();
+    if (!marketReasonOk(reason)) throw new Error(`Reason is required (at least ${MARKET_MIN_REASON} characters)`);
+    await db.transaction(async (tx) => {
+      const [before] = await tx.select().from(schema.gigConfig).limit(1);
+      if (!before) {
+        await tx.insert(schema.gigConfig).values({ ...rates, updatedBy: admin.username ?? "?" });
+      } else {
+        await tx.update(schema.gigConfig).set({ ...rates, updatedBy: admin.username ?? "?", updatedAt: new Date() }).where(eq(schema.gigConfig.id, before.id));
+      }
+      await audit(tx, admin.id, admin.username ?? "?", "gig.config", "gig", "rates", reason, before ?? null, { ...rates, updatedBy: admin.username ?? "?" });
+    });
+    revalidatePath("/admin/gigs");
+    revalidatePath("/jobs");
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "Config failed");
+  }
+}
+
+/**
+ * Claw back a settled shift (bot-speed cheat, overpay, whatever) through the
+ * ledger. The shift is stamped `reversed_at` first so it can only happen
+ * once; the deduction itself rides the moneyAdjust engine (op "deduct",
+ * allowNegative: a spent payout still gets clawed back below zero, admin+).
+ * On failure the stamp is lifted so the action can be retried.
+ */
+export async function gigReverseShift(input: { shiftId: string; reason: string }): Promise<Phase3Result> {
+  let adminId = "";
+  let adminName = "?";
+  try {
+    const admin = await assertRole("admin");
+    adminId = admin.id;
+    adminName = admin.username ?? "?";
+    const reason = (input.reason ?? "").trim();
+    if (!marketReasonOk(reason)) throw new Error(`Reason is required (at least ${MARKET_MIN_REASON} characters)`);
+    const shift = await db.transaction(async (tx) => {
+      const [s] = await tx
+        .update(schema.jobShift)
+        .set({ reversedAt: new Date() })
+        .where(
+          and(
+            eq(schema.jobShift.id, input.shiftId),
+            isNotNull(schema.jobShift.settledAt),
+            isNull(schema.jobShift.reversedAt),
+            sql`${schema.jobShift.earnedCents} > 0`
+          )
+        )
+        .returning();
+      return s ?? null;
+    });
+    if (!shift) throw new Error("Shift not found or already empty");
+    // credit stays for history; a counter-entry zeroes the payout
+    const r = await moneyAdjust({
+      userId: shift.userId,
+      op: "deduct",
+      amountMonos: shift.earnedCents / 100,
+      reason: `Gig shift reversal (${shift.job}): ${reason}`,
+      allowNegative: true,
+    });
+    if (!r.ok) {
+      await db.transaction(async (tx) => {
+        await tx.update(schema.jobShift).set({ reversedAt: null }).where(eq(schema.jobShift.id, shift.id));
+      });
+      return fail(new Error(r.error), "Reverse failed");
+    }
+    await db.transaction(async (tx) => {
+      await audit(tx, adminId, adminName, "gig.reverse", "gig", shift.id, reason, { earned: shift.earnedCents, job: shift.job }, { earned: 0, reversed: true });
+    });
+    revalidatePath("/admin/gigs");
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "Reverse failed");
   }
 }

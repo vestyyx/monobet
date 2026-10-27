@@ -1305,6 +1305,56 @@ const en = {
   reportReasonPh: "Why are you reporting this?",
   reportSend: "Send",
   reportSentToast: "Sent — a moderator will look at it.",
+
+  // ---------- Phase 5 — markets desk (admin+) ----------
+  admMktsTitle: "Markets desk",
+  admMktsSub: "Create, settle, cancel and prune prediction markets. Every settle/cancel/delete writes an audit row.",
+  admMktsEmpty: "No markets match the filter.",
+  admMktsStatusPending: "Pending",
+  admMktsStatusLive: "Live",
+  admMktsStatusResolved: "Resolved",
+  admMktsStatusCancelled: "Cancelled",
+  admMktsStatusRejected: "Rejected",
+  admMktsResolved: "Market resolved",
+  admMktsCancelled: "Market cancelled, positions refunded",
+  admMktsDeleteConfirm: (q: string) => `Nuke “${q}” along with its options? Open positions refund at mark.`,
+  admReasonPh: "Reason (required, min 5 characters)",
+  admReasonTooShort: "Reason — at least 5 characters",
+
+  // ---------- Phase 5 — gigs desk (admin+) ----------
+  admGigTitle: "Gigs desk",
+  admGigSub: "Shift rates for dishwashing and math tutoring, plus the daily earnings cap and the latest shifts.",
+  admGigRates: "Shift rates",
+  admGigDishPay: "Dishes pay (Ɱ)",
+  admGigMathPay: "Math pay (Ɱ)",
+  admGigCap: "24h cap (Ɱ)",
+  admGigRatesNote: "Applies to every payout from now on — a wrong number is history, so it lands on the audit log.",
+  admGigSaved: "Rates saved",
+  admGigDesk: "Shift desk",
+  admGigDeskSub: "Newest 100 settled shifts. A reverse claws the payout back through the ledger (it may go negative if the Mony were already spent).",
+  admGigNoShifts: "No settled shifts yet.",
+  admGigReversed: "Reversed",
+  admGigReversedDone: "Shift reversed",
+  admGigReverse: "Reverse",
+  admGigReversePrompt: (m: string) => `Why are you reversing a ${m} shift?`,
+  admGigReverseConfirm: (u: string, m: string) => `Claw ${m} back from @${u}?`,
+  admGigStarted: "Started",
+  admGigSettled: "Settled",
+
+  // ---------- Phase 5 — economy ----------
+  econTitle: "House & economy",
+  econSub: "What the house banked and the knobs that shape it. Versioned config, exports and reconciliation arrive in Phase 6.",
+
+  // ---------- Phase 5 — duels desk on /admin/moderation ----------
+  admModDuelsTitle: "Duels",
+  admModDuelsSub: "Disputed duels and stale accepted duels waiting on a tiebreak — pick the winner or refund both, always with a reason.",
+  admModStatusDisputed: "Disputed",
+  admModStatusStale: "Stale",
+  duelSettle: "Settle",
+
+  // ---------- Phase 5 — create-user on /admin/players ----------
+  admPlayersCreateTitle: "Create an account",
+  admPlayersCreateSub: "A hand-crafted account for the family — nobody has to fight the sign-up form.",
 };
 
 export type Dict = typeof en;
@@ -2582,6 +2632,56 @@ const cs: Dict = {
   reportReasonPh: "Proč to nahlásíš?",
   reportSend: "Poslat",
   reportSentToast: "Posláno — moderátor se na to podívá.",
+
+  // ---------- Fáze 5 — pult trhů (admin+) ----------
+  admMktsTitle: "Pult trhů",
+  admMktsSub: "Tvorba, vyhodnocení, zrušení i mazání trhů. Každé vyhodnocení/zrušení/mazání zapíše auditní řádek.",
+  admMktsEmpty: "Fitru nic neodpovídá.",
+  admMktsStatusPending: "Čeká",
+  admMktsStatusLive: "Živý",
+  admMktsStatusResolved: "Vyhodnoceno",
+  admMktsStatusCancelled: "Zrušeno",
+  admMktsStatusRejected: "Odmítnuto",
+  admMktsResolved: "Trh vyhodnocen",
+  admMktsCancelled: "Trh zrušen, pozice vyplaceny",
+  admMktsDeleteConfirm: (q: string) => `Smazat „${q}" i s možnostmi? Otevřené pozice se vrací po aktuální ceně.`,
+  admReasonPh: "Důvod (povinný, alespoň 5 znaků)",
+  admReasonTooShort: "Důvod — alespoň 5 znaků",
+
+  // ---------- Fáze 5 — pult brigád (admin+) ----------
+  admGigTitle: "Pult brigád",
+  admGigSub: "Sazby za mytí nádobí a doučování, denní strop výdělku a přehled směn.",
+  admGigRates: "Sazby směn",
+  admGigDishPay: "Mytí nádobí (Ɱ)",
+  admGigMathPay: "Doučování (Ɱ)",
+  admGigCap: "24h strop (Ɱ)",
+  admGigRatesNote: "Platí pro každou budoucí výplatu — špatné číslo je hned historie, takže končí v auditním logu.",
+  admGigSaved: "Sazby uloženy",
+  admGigDesk: "Pult směn",
+  admGigDeskSub: "Posledních 100 ukončených směn. Vrácení si vybere výplatu z účtu přes účetní knihu (může jít do mínusu, když už byly Mony utraceny).",
+  admGigNoShifts: "Zatím žádné ukončené směny.",
+  admGigReversed: "Vráceno",
+  admGigReversedDone: "Směna vrácena",
+  admGigReverse: "Vrátit",
+  admGigReversePrompt: (m: string) => `Proč vracíš směnu za ${m}?`,
+  admGigReverseConfirm: (u: string, m: string) => `Vybrat ${m} hráči @${u}?`,
+  admGigStarted: "Zahájeno",
+  admGigSettled: "Ukončeno",
+
+  // ---------- Fáze 5 — ekonomika ----------
+  econTitle: "Pokladna a ekonomika",
+  econSub: "Co banka vydělala a nastavení, která to řídí. Verzované nastavení, exporty a kontrola součtů přijdou ve fázi 6.",
+
+  // ---------- Fáze 5 — duely na /admin/moderation ----------
+  admModDuelsTitle: "Duely",
+  admModDuelsSub: "Sporné a zastaralé duely čekající na rozhodnutí — vyber vítěze nebo vrať oběma vklady, vždy s důvodem.",
+  admModStatusDisputed: "Spor",
+  admModStatusStale: "Zastaralý",
+  duelSettle: "Vyhodnotit",
+
+  // ---------- Fáze 5 — tvorba účtu na /admin/players ----------
+  admPlayersCreateTitle: "Vytvořit účet",
+  admPlayersCreateSub: "Ručně vytvořený účet pro rodinu — nikdo nemusí bojovat s registračním formulářem.",
 };
 
 const dict: Record<Lang, Dict> = { en, cs };
@@ -2848,6 +2948,13 @@ const ERR_CS: Record<string, string> = {
   "Parent change failed": "Změna rodiče se nepovedla",
   "Squad transfer failed": "Předání squadu se nepovedlo",
   "Kick failed": "Vyřazení se nepovedlo",
+  // admin markets & gigs (fáze 5)
+  "Rates out of bounds (pays 1–50 Ɱ, cap 100–10 000 Ɱ)": "Hodnoty jsou mimo povolené rozsahy (platy 1–50 Ɱ, strop 100–10 000 Ɱ)",
+  "Shift not found or already empty": "Směna nenalezena nebo už je prázdná",
+  "Reverse failed": "Vrácení se nepovedlo",
+  "Config failed": "Uložení se nepovedlo",
+  "Create failed": "Vytvoření se nepovedlo",
+  "Settle failed": "Vyhodnocení se nepovedlo",
 };
 
 // Parameterized server errors — translate the fixed prefix, keep the payload.

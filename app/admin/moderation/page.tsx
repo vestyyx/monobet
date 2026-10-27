@@ -8,13 +8,16 @@ import {
   AdminReportsPanel,
   AdminCommentDesk,
   AdminBlocklistPanel,
+  AdminDuelDesk,
   type AdminReportRow,
   type AdminCommentRow,
   type AdminBlocklistRow,
+  type AdminDuelRow,
 } from "@/components/admin/moderation-panels";
 import { Button, Card, Select, Badge } from "@/components/ui/primitives";
 import { suspicionVerdict, flagOutlierGains } from "@/lib/moderation";
 import { fmtMonos } from "@/lib/money";
+import { getDisputedDuels } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -105,6 +108,13 @@ export default async function AdminModerationPage({
     addedBy: p.addedBy,
     createdAtMs: new Date(p.createdAt).getTime(),
   }));
+
+  // ---------- duels (disputed + stale accepted; settle via adminSettleDispute)
+  const duelRows = (await getDisputedDuels()) as {
+    duel: typeof schema.challenge.$inferSelect;
+    creatorName: string | null;
+    opponentName: string | null;
+  }[];
 
   // ---------- suspicious activity (signals, scored by lib/moderation) ----------
   // 1) several accounts seen behind one IP in the last 14 days
@@ -213,7 +223,7 @@ export default async function AdminModerationPage({
       </section>
 
       {/* suspicious activity */}
-      <section>
+      <section className="mb-8">
         <h2 className="text-[15px] font-semibold mb-2">{t.admModSignals}</h2>
         <p className="text-[12.5px] text-mute mb-2">{t.admModSignalsSub}</p>
         {signals.length === 0 ? (
@@ -230,6 +240,30 @@ export default async function AdminModerationPage({
             ))}
           </div>
         )}
+      </section>
+
+      {/* duels desk — disputed + stale accepted duels (moved from the legacy
+          overview); settle with a reason via the audited adminSettleDispute */}
+      <section>
+        <h2 className="text-[15px] font-semibold mb-2">{t.admModDuelsTitle}</h2>
+        <p className="text-[12.5px] text-mute mb-2">{t.admModDuelsSub}</p>
+        <Card className="overflow-hidden">
+          {(() => {
+            const duels: AdminDuelRow[] = duelRows.map(({ duel: d, creatorName, opponentName }) => ({
+              id: d.id,
+              kind: d.kind,
+              claim: d.claim,
+              stakeCents: d.stakeCents,
+              creatorId: d.creatorId,
+              opponentId: d.opponentId,
+              creatorName,
+              opponentName,
+              status: d.status,
+              pendingWinnerId: d.pendingWinnerId,
+            }));
+            return <AdminDuelDesk lang={lang} duels={duels} />;
+          })()}
+        </Card>
       </section>
     </div>
   );
