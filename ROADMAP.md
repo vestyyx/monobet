@@ -31,6 +31,7 @@
 | 2.2 | Player money management + ledger-backed actions + audit log | ✅ done | `1560d53` (PR #6) |
 | 3 | Users, groups, approvals queue | ✅ done | `36075eb` (PR #7) |
 | 4 | Moderation + suspicious activity | ✅ done | `9cb48f5` (PR #8) |
+| 5 | Markets desk + gigs desk + duel tiebreak + economy | ✅ done | `13031ce` (PR #9) |
 | 5 | Module admin pages (markets, games, gigs) | ⬜ queued | — |
 | 6 | Economy dashboard, config versioning, exports, reconciliation | ⬜ queued | — |
 | 7 | Roles/security hardening, UI polish, tests, 2-min demo path | ⬜ queued | — |
