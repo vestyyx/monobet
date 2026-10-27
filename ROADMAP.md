@@ -29,7 +29,7 @@
 | G2 | Games batch 2: Group Polls + Word/Emoji Guess | ✅ done | `54924ab` (PR #4) |
 | G3 | Games batch 3: Family Quests + Photo Guess | ✅ done | `51206da` (PR #5) |
 | 2.2 | Player money management + ledger-backed actions + audit log | ✅ done | `1560d53` (PR #6) |
-| 3 | Users, groups, approvals queue | ⬜ next | — |
+| 3 | Users, groups, approvals queue | ✅ done | `36075eb` (PR #7) |
 | 4 | Moderation + suspicious activity | ⬜ queued | — |
 | 5 | Module admin pages (markets, games, gigs) | ⬜ queued | — |
 | 6 | Economy dashboard, config versioning, exports, reconciliation | ⬜ queued | — |
@@ -102,9 +102,9 @@ The core of the spec: **every Mony change goes through the ledger, with a reason
 - [ ] Tests: grant/deduct/set/reverse/bulk/limits/negative; every admin endpoint rejects wrong roles; every balance change has ledger + audit rows
 
 ### Phase 3 — Users & groups & approvals
-- [ ] User list: search, filters (role, group, status, new/inactive), sorting; edit profile, role change, force logout, suspend/ban (reason + expiry), kid mode + max stake, merge/flag duplicates
-- [ ] Groups: members, invite codes (regenerate/disable), per-group economy (currency name, stake limits, allowed games), pause/delete, ownership transfer, **Group Parent role inside their group**
-- [ ] Approvals queue: new members + user-created markets/questions/gigs — approve/reject/edit with reason message
+- [x] User list: search, filters (role, group, status, new/inactive), sorting; edit profile, role change, force logout, suspend/ban (reason + expiry), kid mode + max stake, merge/flag duplicates
+- [x] Groups: members, invite codes (regenerate/disable), per-group economy (currency name, stake limits, allowed games), pause/delete, ownership transfer, **Group Parent role inside their group**
+- [x] Approvals queue: new members + user-created markets/questions/gigs — approve/reject/edit with reason message
 
 ### Phase 4 — Moderation & safety
 - [ ] `report` queue UI (comment/market/photo/user/duel) — assign, resolve, dismiss
