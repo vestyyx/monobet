@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, isAdmin } from "@/lib/session";
 import { getLang } from "@/lib/lang-server";
 import { getT } from "@/lib/i18n";
 import { getSquadHub, getSquads } from "@/lib/queries";
@@ -46,6 +46,7 @@ export default async function SquadsPage() {
           myDebtCents={user.squadDebtCents}
           members={hub.members}
           activity={hub.activity.map((a) => ({ ...a, createdAt: a.createdAt.toISOString() }))}
+          canKick={user.squadRole === "parent" || isAdmin(user) || user.role === "moderator"}          squadPaused={!!hub.squad.pausedAt}
           // eslint-disable-next-line react-hooks/purity -- server component renders once per request
           now={Date.now()}
         />

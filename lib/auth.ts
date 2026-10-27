@@ -29,6 +29,7 @@ export const auth = betterAuth({
       balanceCents: { type: "number", defaultValue: 100_000, input: false },
       lastClaimAt: { type: "date", required: false, input: false },
       bannedAt: { type: "date", required: false, input: false },
+      bannedUntil: { type: "date", required: false, input: false },
       banReason: { type: "string", required: false, input: false },
       commentsBanned: { type: "boolean", required: false, input: false },
       commentBanUntil: { type: "date", required: false, input: false },
@@ -40,6 +41,7 @@ export const auth = betterAuth({
       debtRateBps: { type: "number", required: false, input: false },
       debtSince: { type: "date", required: false, input: false },
       squadId: { type: "string", required: false, input: false },
+      squadRole: { type: "string", required: false, input: false },
       squadDebtCents: { type: "number", required: false, input: false },
 
     },

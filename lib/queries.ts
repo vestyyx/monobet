@@ -1481,6 +1481,7 @@ export async function getSquadHub(squadId: string, viewerId: string) {
       image: schema.user.image,
       balanceCents: schema.user.balanceCents,
       squadDebtCents: schema.user.squadDebtCents,
+      squadRole: schema.user.squadRole,
     })
     .from(schema.user)
     .where(eq(schema.user.squadId, squadId));

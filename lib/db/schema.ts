@@ -61,6 +61,12 @@ export const user = pgTable("user", {
   kidMode: boolean("kid_mode").notNull().default(false),
   maxStakeCents: integer("max_stake_cents"),
   squadId: uuid("squad_id"),
+  // Temp bans expire on their own (requireUser lifts them when the date
+  // passes); permanent bans have bannedUntil = null.
+  bannedUntil: timestamp("banned_until", { withTimezone: true }),
+  // Group Parent (Phase 3): a rank inside the squad — parents may kick
+  // members. null = ordinary member.
+  squadRole: text("squad_role"),
   // House debt — voluntary loans land here (levered games never borrow). Rate is APR in
   // basis points rolled at borrow time; interest accrues lazily off debtSince.
   debtCents: bigint("debt_cents", { mode: "number" }).notNull().default(0),
@@ -430,6 +436,11 @@ export const squad = pgTable(
     // Shared pot — members contribute, members borrow against it.
     treasuryCents: bigint("treasury_cents", { mode: "number" }).notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    // Phase 3 admin tools: a paused squad refuses new joins/invites/coins;
+    // the parent shares a 6-char invite code with friends when enabled.
+    pausedAt: timestamp("paused_at", { withTimezone: true }),
+    inviteCode: text("invite_code").unique(),
+    inviteEnabled: boolean("invite_enabled").notNull().default(true),
   }
 );
 

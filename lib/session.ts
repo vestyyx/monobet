@@ -1,6 +1,8 @@
 import { headers } from "next/headers";
 import { cache } from "react";
+import { eq } from "drizzle-orm";
 import { auth, SUPER_ADMIN_EMAIL } from "@/lib/auth";
+import { db, schema } from "@/lib/db";
 import { touchActivity, todayUtc } from "@/lib/activity";
 import { SEEN_THROTTLE_MS } from "@/lib/rewards";
 
@@ -24,8 +26,10 @@ export type CurrentUser = {
   debtRateBps: number;
   debtSince: Date | null;
   squadId: string | null;
+  squadRole: string | null;
   squadDebtCents: number;
   bannedAt: Date | null;
+  bannedUntil: Date | null;
   banReason: string | null;
 };
 
@@ -57,7 +61,9 @@ export const getCurrentUser = cache(async function getCurrentUser(): Promise<Cur
     debtRateBps?: number;
     debtSince?: Date | null;
     squadId?: string | null;
+    squadRole?: string | null;
     squadDebtCents?: number;
+    bannedUntil?: string | Date | null;
     banReason?: string | null;
   };
   // Presence roll — first hit of a UTC day pays the streak bonus and stamps
@@ -94,8 +100,10 @@ export const getCurrentUser = cache(async function getCurrentUser(): Promise<Cur
     debtRateBps: u.debtRateBps ?? 0,
     debtSince: u.debtSince ?? null,
     squadId: u.squadId ?? null,
+    squadRole: u.squadRole ?? null,
     squadDebtCents: u.squadDebtCents ?? 0,
     bannedAt: u.bannedAt ?? null,
+    bannedUntil: u.bannedUntil ?? null,
     banReason: u.banReason ?? null,
   };
 });
@@ -105,7 +113,23 @@ export async function requireUser(): Promise<CurrentUser> {
   if (!u) throw new Error("Sign in required");
   // Read-only accounts: every server action funnels through here, so this one
   // check blocks trades, games, comments, votes — the banned user can only view.
-  if (u.bannedAt) throw new Error("Account suspended");
+  if (u.bannedAt) {
+    // Temp bans lift themselves: once `banned_until` passes, the very next
+    // authenticated action clears the flags on the spot (family scale — no
+    // cron needed).
+    if (u.bannedUntil && new Date(u.bannedUntil).getTime() <= Date.now()) {
+      try {
+        await db
+          .update(schema.user)
+          .set({ bannedAt: null, bannedUntil: null, banReason: null })
+          .where(eq(schema.user.id, u.id));
+      } catch {
+        /* fall through — the ban stays until the next action */
+      }
+    } else {
+      throw new Error("Account suspended");
+    }
+  }
   return u;
 }
 
