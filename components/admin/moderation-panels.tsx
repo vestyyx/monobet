@@ -18,8 +18,9 @@ import {
   modMutePlayer,
   modAddBlockPattern,
   modRemoveBlockPattern,
+  adminSettleDispute,
 } from "@/lib/actions-admin";
-import { fmtDateTime } from "@/lib/money";
+import { fmtDateTime, fmtMonos } from "@/lib/money";
 import { getT, serverErr, type Lang } from "@/lib/i18n";
 import { Eye, EyeOff, Flag, ShieldCheck, TimerOff, Trash2, X, UserX } from "lucide-react";
 
@@ -247,6 +248,109 @@ export function AdminBlocklistPanel({ lang, patterns }: { lang: Lang; patterns: 
         </Card>
       ))}
       {patterns.length === 0 && <p className="text-[12.5px] text-mute py-4 text-center">{t.admModNoPatterns}</p>}
+    </div>
+  );
+}
+
+// ============================================================
+// disputed duels (moved from the legacy overview in Phase 5)
+// ============================================================
+export type AdminDuelRow = {
+  id: string;
+  kind: string;
+  claim: string;
+  stakeCents: number;
+  creatorName: string | null;
+  opponentName: string | null;
+  status: string; // disputed | accepted (stale)
+  pendingWinnerId: string | null;
+  creatorId: string;
+  opponentId: string;
+};
+
+// Dispute tiebreak: pick the winner for the full pot, or refund both stakes.
+// Settling goes through the audited adminSettleDispute with a mandatory
+// reason — duels are player-to-player money, so they go on the record.
+export function AdminDuelDesk({ lang, duels }: { lang: Lang; duels: AdminDuelRow[] }) {
+  const t = getT(lang);
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [reason, setReason] = useState("");
+
+  const run = (fn: () => Promise<{ ok: boolean; error?: string }>, okMsg?: string) =>
+    start(async () => {
+      try {
+        const res = await fn();
+        if (!res.ok) throw new Error(res.error ?? "Error");
+        if (okMsg) toast.success(okMsg);
+        setReason("");
+        setOpenId(null);
+        router.refresh();
+      } catch (e) {
+        toast.error(serverErr(lang, e instanceof Error ? e.message : null) ?? "Error");
+      }
+    });
+
+  if (duels.length === 0) return <p className="text-[12.5px] text-mute py-6 text-center">{t.duelNoDisputes}</p>;
+
+  const decide = (d: AdminDuelRow, pick: "creator" | "opponent" | "both") => {
+    const winnerId = pick === "creator" ? d.creatorId : pick === "opponent" ? d.opponentId : null;
+    run(() => adminSettleDispute({ duelId: d.id, winnerId, reason }), t.duelSettledToast);
+  };
+
+  return (
+    <div className="divide-y divide-line">
+      {duels.map((d) => {
+        const open = openId === d.id;
+        const name = (n: string | null) => (n ? `@${n}` : "?");
+        return (
+          <div key={d.id} className="px-1 py-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex-1 min-w-0">
+                <div className="text-[13px] font-medium leading-snug">{d.claim}</div>
+                <div className="text-[11.5px] text-faint mt-0.5">
+                  {name(d.creatorName)} vs {name(d.opponentName)} · {fmtMonos(d.stakeCents * 2, { lang })} ·{" "}
+                  {d.status === "disputed" ? t.admModStatusDisputed : t.admModStatusStale}
+                </div>
+              </div>
+              <Button
+                size="xs"
+                variant="yes"
+                disabled={pending}
+                className="shrink-0"
+                onClick={() => {
+                  setOpenId(open ? null : d.id);
+                  setReason("");
+                }}
+              >
+                {t.duelSettle}
+              </Button>
+            </div>
+            {open && (
+              <div className="mt-3 pt-3 border-t border-line flex flex-col gap-2">
+                <Input
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder={t.admReasonPh}
+                  className="h-8 text-[12.5px]"
+                />
+                <div className="flex flex-wrap gap-1.5">
+                  <Button size="sm" variant="yes" disabled={pending || reason.trim().length < 5} onClick={() => decide(d, "creator")}>
+                    {name(d.creatorName)}
+                  </Button>
+                  <Button size="sm" variant="yes" disabled={pending || reason.trim().length < 5} onClick={() => decide(d, "opponent")}>
+                    {name(d.opponentName)}
+                  </Button>
+                  <Button size="sm" variant="outline" disabled={pending || reason.trim().length < 5} onClick={() => decide(d, "both")}>
+                    {t.duelRefundBoth}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

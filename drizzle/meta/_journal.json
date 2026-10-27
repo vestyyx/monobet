@@ -407,6 +407,13 @@
       "when": 1793131863786,
       "tag": "0057_moderation-blocklist",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1793134053925,
+      "tag": "0058_gig-config",
+      "breakpoints": true
     }
   ]
 }

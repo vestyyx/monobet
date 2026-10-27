@@ -14,6 +14,7 @@ import {
   MATH_PROBLEMS,
   mathAnswer,
   mathPay,
+  jobRatesOk,
 } from "./jobs";
 
 describe("dishwashing pay", () => {
@@ -93,5 +94,28 @@ describe("daily job earnings cap", () => {
     expect(capJobPay(10_000, JOB_DAILY_CAP_CENTS)).toBe(0);
     expect(capJobPay(-1, 0)).toBe(0);
     expect(capJobPay(Number.NaN, 0)).toBe(0);
+  });
+  it("accepts an admin-tuned cap", () => {
+    expect(capJobPay(30_000, 0, 20_000)).toBe(20_000);
+  });
+});
+
+describe("gig rate config", () => {
+  it("bounds every knob so a typo can't mint money", () => {
+    expect(jobRatesOk({ dishPayCents: 300, mathPayCents: 500, dailyCapCents: 50_000 })).toBe(true);
+    expect(jobRatesOk({ dishPayCents: 99, mathPayCents: 500, dailyCapCents: 50_000 })).toBe(false);
+    expect(jobRatesOk({ dishPayCents: 300, mathPayCents: 5_001, dailyCapCents: 50_000 })).toBe(false);
+    expect(jobRatesOk({ dishPayCents: 300, mathPayCents: 500, dailyCapCents: 1_000_001 })).toBe(false);
+    expect(jobRatesOk({ dishPayCents: 300.5, mathPayCents: 500, dailyCapCents: 50_000 })).toBe(false);
+  });
+
+  it("pays scale with the configured rates", () => {
+    const double = { dishPayCents: 600, mathPayCents: 1_000, dailyCapCents: 100_000 };
+    const problems = genMathProblems(() => 0.5);
+    const answers = problems.map(mathAnswer);
+    expect(dishesPay(12, DISH_PLATES * DISH_MIN_MS_PER_PLATE, double)).toBe(12 * 600);
+    expect(mathPay(problems, answers, MATH_PROBLEMS * MATH_MIN_MS_PER_ANSWER, double)).toBe(
+      MATH_PROBLEMS * 1_000
+    );
   });
 });
