@@ -7,10 +7,10 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button, Input, Select, Badge, Card, Textarea } from "@/components/ui/primitives";
-import { adminFunCreateTriviaQuestion, adminFunCreateGuessRound, adminFunCreatePoll, adminFunCreateEmojiRound, adminFunCreateQuest, adminFunCreatePhotoRound, guessSettle, pollSettle, emojiReveal, questReview, photoReveal, type QuestClaimAdminRow } from "@/lib/actions-fun";
+import { adminFunCreateTriviaQuestion, adminFunCreateGuessRound, adminFunCreatePoll, adminFunCreateEmojiRound, adminFunCreateQuest, adminFunCreatePhotoRound, guessSettle, pollSettle, emojiReveal, questReview, photoReveal, adminFunCreateBracket, adminFunSettleBracket, type QuestClaimAdminRow } from "@/lib/actions-fun";
 import { fmtMonos } from "@/lib/money";
 import { getT, type Lang } from "@/lib/i18n";
-import { Loader2, Coins, Target } from "lucide-react";
+import { Loader2, Coins, Target, Trophy } from "lucide-react";
 
 // ---------- trivia bank ----------
 export type TriviaBankRow = {
@@ -949,6 +949,162 @@ export function AdminPhotoPanel({ lang, rounds }: { lang: Lang; rounds: PhotoAdm
                       {revealing === r.id && <Loader2 className="size-3.5 animate-spin" />}
                       {t.admEmojiReveal}
                     </Button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+// ---------- bracket pools ("tipovačky pavouků") ----------
+export type BracketAdminRow = {
+  id: string;
+  titleCs: string;
+  titleEn: string;
+  closeAt: Date;
+  status: "open" | "settled";
+  matches: { label: string; points: number }[];
+  results: string[] | null;
+  entryCount: number;
+  rewardCents: number;
+  consolationCents: number;
+};
+
+export function AdminBracketPanel({ lang, pools }: { lang: Lang; pools: BracketAdminRow[] }) {
+  const t = getT(lang);
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [titleCs, setTitleCs] = useState("");
+  const [titleEn, setTitleEn] = useState("");
+  const [hours, setHours] = useState("168");
+  const [reward, setReward] = useState("200");
+  const [consolation, setConsolation] = useState("50");
+  const [matchesRaw, setMatchesRaw] = useState("");
+  const [settling, setSettling] = useState<string | null>(null);
+  const [winnersRaw, setWinnersRaw] = useState<Record<string, string>>({});
+
+  const create = () => {
+    if (pending) return;
+    start(async () => {
+      const res = await adminFunCreateBracket({
+        titleCs,
+        titleEn,
+        closeInHours: parseInt(hours, 10) || 168,
+        rewardMonos: parseFloat(reward) || 200,
+        consolationMonos: parseFloat(consolation) || 50,
+        matchesRaw,
+      });
+      if (!res.ok) toast.error(res.error ?? "Error");
+      else {
+        toast.success(t.savedToast);
+        setTitleCs(""); setTitleEn(""); setMatchesRaw("");
+        router.refresh();
+      }
+    });
+  };
+
+  const settle = (id: string) => {
+    if (pending) return;
+    setSettling(id);
+    start(async () => {
+      const res = await adminFunSettleBracket(id, winnersRaw[id] ?? "");
+      setSettling(null);
+      if (!res.ok) toast.error(res.error ?? "Error");
+      else {
+        toast.success(t.admBracketSettled(fmtMonos(res.paid ?? 0, { lang })));
+        router.refresh();
+      }
+    });
+  };
+
+  return (
+    <div className="grid gap-5 lg:grid-cols-2">
+      <Card className="p-5">
+        <h2 className="font-semibold text-[15px] mb-1 flex items-center gap-2">
+          <Trophy className="size-4 text-brand" /> {t.admBracketNew}
+        </h2>
+        <p className="text-[12px] text-mute mb-4">{t.admBracketSub}</p>
+        <div className="grid gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="text-[11.5px] font-semibold text-mute">{t.admBracketTitleCs}</label>
+              <Input value={titleCs} onChange={(e) => setTitleCs(e.target.value)} className="mt-1" />
+            </div>
+            <div>
+              <label className="text-[11.5px] font-semibold text-mute">{t.admBracketTitleEn}</label>
+              <Input value={titleEn} onChange={(e) => setTitleEn(e.target.value)} className="mt-1" />
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <label className="text-[11.5px] font-semibold text-mute">{t.admBracketCloseIn}</label>
+              <Input type="number" value={hours} onChange={(e) => setHours(e.target.value)} className="mt-1 num" />
+            </div>
+            <div>
+              <label className="text-[11.5px] font-semibold text-mute">{t.admBracketReward}</label>
+              <Input type="number" value={reward} onChange={(e) => setReward(e.target.value)} className="mt-1 num" />
+            </div>
+            <div>
+              <label className="text-[11.5px] font-semibold text-mute">{t.admBracketConsolation}</label>
+              <Input type="number" value={consolation} onChange={(e) => setConsolation(e.target.value)} className="mt-1 num" />
+            </div>
+          </div>
+          <div>
+            <label className="text-[11.5px] font-semibold text-mute">{t.admBracketMatches}</label>
+            <Textarea value={matchesRaw} onChange={(e) => setMatchesRaw(e.target.value)} placeholder={t.admBracketMatchesPh} rows={6} className="mt-1" />
+          </div>
+          <div>
+            <Button onClick={create} disabled={pending || !titleCs.trim() || !titleEn.trim() || matchesRaw.trim().split(/\r?\n/).filter((l) => l.trim()).length < 2}>
+              {pending && <Loader2 className="size-4 animate-spin" />} {t.admBracketCreateCta}
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      <Card className="p-5">
+        <h2 className="font-semibold text-[15px] mb-3">{t.admBracketPools}</h2>
+        {pools.length === 0 ? (
+          <p className="text-[13px] text-mute">{t.admBracketPoolEmpty}</p>
+        ) : (
+          <div className="divide-y divide-line-2 max-h-[520px] overflow-y-auto">
+            {pools.map((p) => (
+              <div key={p.id} className="py-3">
+                <div className="flex items-start gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[13px] font-medium">{p.titleCs}</div>
+                    <div className="text-[11.5px] text-faint truncate">{p.titleEn}</div>
+                  </div>
+                  <Badge tone={p.status === "settled" ? "ink" : "yes"}>
+                    {p.status === "settled" ? t.bracketSettledT : t.admGuessOpenBadge}
+                  </Badge>
+                </div>
+                <div className="mt-1 flex flex-wrap gap-2 text-[11.5px] text-faint">
+                  <span>{t.admBracketMatchCount(p.matches.length)}</span>
+                  <span>{t.bracketEntries(p.entryCount)}</span>
+                  <span>Ɱ{Math.round(p.rewardCents / 100)}</span>
+                  {p.status === "settled" ? (
+                    <span className="text-brand font-semibold">{p.results ? p.results.join(" · ") : "—"}</span>
+                  ) : (
+                    <span>{closedLabel(p.closeAt)}</span>
+                  )}
+                </div>
+                {p.status === "open" && (
+                  <div className="mt-2">
+                    <Textarea
+                      value={winnersRaw[p.id] ?? ""}
+                      onChange={(e) => setWinnersRaw((w) => ({ ...w, [p.id]: e.target.value }))}
+                      placeholder={t.admBracketWinnersPh}
+                      rows={3}
+                    />
+                    <div className="mt-2">
+                      <Button onClick={() => settle(p.id)} disabled={pending && settling === p.id}>
+                        {pending && settling === p.id && <Loader2 className="size-4 animate-spin" />} {t.admBracketSettle}
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>

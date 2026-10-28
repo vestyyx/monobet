@@ -123,6 +123,53 @@ export function funRoundOpen(status: string, closeAt: string | number | Date): b
   return new Date(closeAt).getTime() > Date.now();
 }
 
+// ---------- bracket pools ----------
+// Season-long bracket pools ("tipovačky pavouků"): the admin lists the matches
+// (each worth points), players submit a winner per match until the deadline,
+// then the admin reveals the real winners and the best brackets get paid.
+export const BRACKET_REWARD_CENTS = 20_000; // Ɱ200 for the top bracket
+export const BRACKET_CONSOLATION_CENTS = 5_000; // token for other scoring brackets
+export const BRACKET_MAX_MATCHES = 64; // family-scale tournaments only
+export const BRACKET_PICK_MAX = 60; // chars per pick (a team/country name)
+export const BRACKET_MATCH_LABEL_MAX = 120;
+
+export type BracketMatch = { label: string; points: number };
+
+// Parse the admin textarea: one match per line, "label | points" — points
+// optional (default 1, clamped 1..100). Lines past the cap are dropped.
+export function parseBracketMatches(raw: string): BracketMatch[] {
+  const lines = (raw ?? "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const out: BracketMatch[] = [];
+  for (const line of lines) {
+    let label = line;
+    let points = 1;
+    const parts = line.split("|");
+    if (parts.length >= 2) {
+      const tail = Number(parts[parts.length - 1].trim());
+      if (Number.isFinite(tail)) {
+        label = parts.slice(0, -1).join("|").trim();
+        points = Math.max(1, Math.min(100, Math.round(tail)));
+      }
+    }
+    if (!label) continue;
+    out.push({ label: label.slice(0, BRACKET_MATCH_LABEL_MAX), points });
+    if (out.length >= BRACKET_MAX_MATCHES) break;
+  }
+  return out;
+}
+
+// Score a bracket: points for every match where the pick equals the revealed
+// winner (normalized — case, diacritics and punctuation don't matter, same
+// semantics as the riddle answers).
+export function bracketScore(picks: Record<string, string>, winners: string[], matches: BracketMatch[]): number {
+  return matches.reduce((sum, m, i) => {
+    const pick = picks?.[String(i)] ?? "";
+    const win = winners[i] ?? "";
+    const np = emojiNormalize(pick);
+    return sum + (np.length > 0 && np === emojiNormalize(win) ? m.points : 0);
+  }, 0);
+}
+
 // ---------- family quests ----------
 // Default payout for an approved quest claim (Ɱ100); the admin sets it per
 // quest, small fixed amounts only.

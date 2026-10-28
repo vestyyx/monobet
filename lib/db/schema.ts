@@ -319,7 +319,8 @@ export type LedgerKind =
   | "poll"
   | "emoji"
   | "photo"
-  | "quest";
+  | "quest"
+  | "bracket";
 
 export const ledger = pgTable(
   "ledger",
@@ -912,5 +913,47 @@ export const photoAttempt = pgTable(
     // Same first-solver guarantee as the emoji riddles — one correct row max.
     uniqueIndex("photo_first_solver_idx").on(t.roundId).where(sql`correct`),
     index("photo_attempt_round_idx").on(t.roundId, t.userId),
+  ]
+);
+
+// Bracket pool — "tipovačky pavouků": a season-long prediction game. The admin
+// lists the matches (each with its own point value), players submit a winner
+// per match until closeAt, then the admin reveals the real winners (results)
+// and settles: top-scoring brackets win in full, other scoring brackets get
+// the consolation token. Free-play only — fixed Mony prizes via the ledger.
+export const bracketPool = pgTable(
+  "bracket_pool",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    titleCs: text("title_cs").notNull(),
+    titleEn: text("title_en").notNull(),
+    closeAt: timestamp("close_at", { withTimezone: true }).notNull(), // picks deadline
+    status: text("status").notNull().default("open"), // open | settled
+    rewardCents: integer("reward_cents").notNull().default(20_000), // Ɱ200 for the top bracket
+    consolationCents: integer("consolation_cents").notNull().default(5_000), // other scoring brackets
+    matches: jsonb("matches").notNull().$type<{ label: string; points: number }[]>(), // ordered
+    results: jsonb("results").$type<string[]>(), // revealed winner per match, stamped at settle
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    settledBy: text("settled_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("bracket_pool_status_idx").on(t.status, t.closeAt)]
+);
+
+export const bracketPick = pgTable(
+  "bracket_pick",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    poolId: uuid("pool_id").notNull().references(() => bracketPool.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    picks: jsonb("picks").notNull().$type<Record<string, string>>(), // { matchIndex: winner pick }
+    score: integer("score").notNull().default(0), // stamped at settle
+    rewardCents: integer("reward_cents").notNull().default(0), // payout stamp, 0 = none
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("bracket_pick_once_idx").on(t.poolId, t.userId),
+    index("bracket_pick_pool_idx").on(t.poolId),
   ]
 );

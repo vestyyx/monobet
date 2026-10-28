@@ -207,8 +207,8 @@ export const ADMIN_MODULES: AdminModuleDef[] = [
     descCs: "Celosezónní tipování výsledků s pravidly bodování a výherci.",
     icon: Trophy,
     minRole: "admin",
-    built: false,
-    deliveryPhase: "Phase 4+ (family games)",
+    built: true, // live since the family-games batch 4 — /admin/brackets
+    deliveryPhase: "Family games · live",
     group: "games",
   },
   {
