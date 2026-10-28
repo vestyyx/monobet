@@ -27,7 +27,7 @@ export default async function AdminMarketsPage({
   const lang = await getLang();
   const t = getT(lang);
   const sp = await searchParams;
-  const status = ["live", "pending", "resolved", "cancelled", "all"].includes(sp.status ?? "") ? sp.status! : "live";
+  const status = ["live", "pending", "resolved", "cancelled", "deleted", "all"].includes(sp.status ?? "") ? sp.status! : "live";
 
   // Server-side filtering via plain GET params (same pattern as the audit log).
   const conds: SQL[] = [];
@@ -93,6 +93,7 @@ export default async function AdminMarketsPage({
           <option value="pending">{t.admMktsStatusPending}</option>
           <option value="resolved">{t.admMktsStatusResolved}</option>
           <option value="cancelled">{t.admMktsStatusCancelled}</option>
+          <option value="deleted">{t.admMktsStatusDeleted}</option>
           <option value="all">{t.admModAll}</option>
         </Select>
         <Button size="sm" type="submit" variant="outline">

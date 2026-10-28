@@ -74,6 +74,8 @@ export function AdminMarketsPanel({ lang, markets }: { lang: Lang; markets: Admi
         return <Badge tone="warn">{t.admMktsStatusCancelled}</Badge>;
       case "rejected":
         return <Badge tone="no">{t.admMktsStatusRejected}</Badge>;
+      case "deleted":
+        return <Badge tone="mute">{t.admMktsStatusDeleted}</Badge>;
       default:
         return <Badge tone="mute">{t.admMktsStatusPending}</Badge>;
     }

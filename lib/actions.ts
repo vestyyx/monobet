@@ -1816,8 +1816,15 @@ export async function deleteMarket(marketId: string): Promise<{ ok: boolean; err
           }
         }
       }
-      // Deleting the parent cascades children; for singles it's just the row.
-      await tx.delete(schema.market).where(eq(schema.market.id, m.id));
+      // Soft delete (Phase 7): refund open positions at mark, drop the
+      // position rows (same lifecycle as a settle), then mark the market and
+      // its option children "deleted" — rows and trade history stay for the
+      // books instead of cascading away.
+      await tx
+        .update(schema.market)
+        .set({ status: "deleted" })
+        .where(inArray(schema.market.id, ids));
+      await tx.delete(schema.position).where(inArray(schema.position.marketId, ids));
       // An option row leaving the group can empty it — roll the parent up so
       // it doesn't sit "live" with nothing left to trade.
       await syncGroupStatus(tx, m);

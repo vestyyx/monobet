@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { and, desc, eq, ilike, isNotNull, isNull, or, sql, type SQL } from "drizzle-orm";
 import { requireRole } from "@/lib/admin/rbac";
 import { getLang } from "@/lib/lang-server";
@@ -15,7 +16,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminPlayersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; role?: string; status?: string }>;
+  searchParams: Promise<{ q?: string; role?: string; status?: string; page?: string }>;
 }) {
   const admin = await requireRole("moderator");
   if (!admin) redirect("/login");
@@ -24,13 +25,26 @@ export default async function AdminPlayersPage({
   const sp = await searchParams;
 
   // Server-side filtering via plain GET params (same pattern as the audit log).
-  const conds: SQL[] = [];
-  if (sp.q) conds.push(or(ilike(schema.user.username, `%${sp.q}%`), ilike(schema.user.name, `%${sp.q}%`))!);
+  const conds: SQL[] = [];  if (sp.q) conds.push(or(ilike(schema.user.username, `%${sp.q}%`), ilike(schema.user.name, `%${sp.q}%`))!);
   if (sp.role) conds.push(eq(schema.user.role, sp.role));
   if (sp.status === "frozen") conds.push(isNotNull(schema.user.frozenAt));
   if (sp.status === "banned") conds.push(isNotNull(schema.user.bannedAt));
   if (sp.status === "kid") conds.push(eq(schema.user.kidMode, true));
   if (sp.status === "active") conds.push(and(isNull(schema.user.bannedAt), isNull(schema.user.frozenAt))!);
+
+  // Phase 7 pagination: 50 per page, offset-based, filters carried through
+  // the prev/next links below.
+  const PAGE_SIZE = 50;
+  const pageNum = Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1);
+
+  const [countRow] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(schema.user)
+    .where(conds.length ? and(...conds) : undefined);
+  const total = countRow?.n ?? 0;
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const page = Math.min(pageNum, pages);
+  const offset = (page - 1) * PAGE_SIZE;
 
   const rows = await db
     .select({
@@ -55,7 +69,8 @@ export default async function AdminPlayersPage({
     .leftJoin(schema.squad, eq(schema.user.squadId, schema.squad.id))
     .where(conds.length ? and(...conds) : undefined)
     .orderBy(desc(schema.user.createdAt))
-    .limit(300);
+    .limit(PAGE_SIZE)
+    .offset(offset);
 
   const users: AdminUserRow[] = rows.map((u) => ({
     id: u.id,
@@ -74,6 +89,17 @@ export default async function AdminPlayersPage({
     squadName: u.squadName ?? null,
     balanceCents: u.balanceCents,
   }));
+
+  // Prev/next link that carries the active filters along.
+  const pageUrl = (p: number) => {
+    const qs = new URLSearchParams();
+    if (sp.q) qs.set("q", sp.q);
+    if (sp.role) qs.set("role", sp.role);
+    if (sp.status) qs.set("status", sp.status);
+    if (p > 1) qs.set("page", String(p));
+    const s = qs.toString();
+    return s ? `/admin/players?${s}` : "/admin/players";
+  };
 
   return (
     <div className="py-2">
@@ -103,6 +129,28 @@ export default async function AdminPlayersPage({
       </form>
 
       <AdminPlayersPanel lang={lang} players={users} />
+
+      {pages > 1 && (
+        <div className="flex items-center justify-center gap-3 mt-4 text-[12.5px]">
+          {page > 1 ? (
+            <Link href={pageUrl(page - 1)} className="text-brand hover:underline underline-offset-2">
+              ← {t.pagerPrev}
+            </Link>
+          ) : (
+            <span className="text-faint">←</span>
+          )}
+          <span className="text-mute">
+            {page} / {pages}
+          </span>
+          {page < pages ? (
+            <Link href={pageUrl(page + 1)} className="text-brand hover:underline underline-offset-2">
+              {t.pagerNext} →
+            </Link>
+          ) : (
+            <span className="text-faint">→</span>
+          )}
+        </div>
+      )}
 
       {/* create an account (admin+) — migrated from the legacy overview */}
       <Card className="mt-8 max-w-xl">

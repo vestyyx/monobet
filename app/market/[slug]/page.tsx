@@ -267,6 +267,7 @@ export default async function MarketPage({ params, searchParams }: { params: Pro
             {market.status === "cancelled" && <Badge tone="mute" className="mt-1.5">{t.cancelled}</Badge>}
             {market.status === "pending" && <Badge tone="warn" className="mt-1.5">{t.pendingApproval}</Badge>}
             {market.status === "rejected" && <Badge tone="no" className="mt-1.5">{t.rejected}</Badge>}
+            {market.status === "deleted" && <Badge tone="no" className="mt-1.5">{t.deleted}</Badge>}
             {canDelete && (
               <DeleteMarketButton marketId={market.id} question={market.question} admin={isAdmin(user)} lang={lang} />
             )}

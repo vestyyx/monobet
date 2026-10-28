@@ -24,6 +24,19 @@ export const auth = betterAuth({
     enabled: true,
     requireEmailVerification: false,
   },
+  // Phase 7 hardening: explicit session lifetime + rate limits. better-auth's
+  // built-in special rules already hold sign-in/sign-up to 3 attempts per 10 s
+  // window per IP; the explicit config makes the defaults sticky and slightly
+  // wider for everything else (a family-sized app needs no more).
+  session: {
+    expiresIn: 60 * 60 * 24 * 30, // 30 days
+    updateAge: 60 * 60 * 24, // refresh the cookie at most once a day
+  },
+  rateLimit: {
+    enabled: true, // default-on in production — pinned explicitly
+    window: 60,
+    max: 100,
+  },
   user: {
     additionalFields: {
       role: { type: "string", defaultValue: "user", input: false },

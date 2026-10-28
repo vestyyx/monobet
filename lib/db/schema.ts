@@ -120,7 +120,7 @@ export const verification = pgTable("verification", {
 
 // ---------- MonoBet tables ----------
 
-export type MarketStatus = "pending" | "live" | "resolved" | "cancelled" | "rejected";
+export type MarketStatus = "pending" | "live" | "resolved" | "cancelled" | "rejected" | "deleted";
 export type MarketOutcome = "yes" | "no";
 export type MarketKind = "binary" | "group" | "option";
 
