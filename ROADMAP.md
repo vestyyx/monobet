@@ -5,7 +5,7 @@
 > **MonoPredict** — a private, family-and-friends forecasting game. Sunčný, family-friendly, zero gambling.
 > Mony (Ɱ) are play points with no monetary value.
 >
-> Last updated: 2026-10-27 · · All verification = `npx tsc --noEmit` + `npm run lint` + `npx vitest run`
+> Last updated: 2026-10-28 · · All verification = `npx tsc --noEmit` + `npm run lint` + `npx vitest run`
 
 ---
 
@@ -34,6 +34,7 @@
 | 5 | Markets desk + gigs desk + duel tiebreak + economy | ✅ done | `13031ce` (PR #9) |
 | 6 | Settings: announcements, maintenance, registration + versioned config | ✅ done | `e4616e1` (PR #10) |
 | 7 | Hardening & polish: rate limits, headers, soft-delete, pagination, demo path | ✅ done | `cc8961f` (PR #11) |
+| 8 | Bracket pools (tipovačky pavouků) — the last unbuilt module | ✅ done | `37754c3` (PR #12) |
 
 ---
 
@@ -83,6 +84,15 @@
 - [x] `photo_round` + `photo_attempt`: admin publishes a compressed (canvas, ≤ 400 KB data URL stored in DB) photo; 3 guesses, nudge unlocks at 60 %, first correct solver settles and takes the Ɱ200 — enforced by partial unique index `photo_first_solver_idx`; answers never ship while open; expired rounds auto-close lazily (`revealedBy:"auto"`)
 - [x] Player pages `/quests` + `/photo` (claim/resubmit states, compressed photo upload with preview); admin `/admin/quests` (creator + review desk with proof-photo thumbs) + `/admin/photo-guess` (pick→compress→publish, guess counts, reveal); registry `built: true`; `/games` hub at 6 cards; ledger kind `photo` labels CZ/EN
 - [x] E2E green: claim→approve→ledger `quest` +Ɱ120 + audit; wrong guess burns attempt, "colorful bubbles!!!" settles + pays Ɱ200 `photo`; create + reveal audited (`game.questCreate`/`game.photoCreate`/`game.photoReveal`)
+
+## ✅ Done: games batch 4 (PR #12, `37754c3`, live)
+
+### Bracket pools — "tipovačky pavouků"
+- [x] Migration `0060_bracket.sql`: `bracket_pool` (bilingual title, picks deadline, status open|settled, Ɱ200 top-bracket reward + Ɱ50 consolation defaults, `matches` jsonb `[{label, points}]`, `results` jsonb winners stamped at settle) + `bracket_pick` (unique pool+user, picks jsonb, score/reward payout stamps)
+- [x] Pure core + tests (`lib/fun.ts`): `parseBracketMatches` (one match per line "label | points", points default 1, clamp 1..100, ≤64 matches) + `bracketScore` (normalized compare — case/diacritics/punctuation-insensitive); 113 tests green
+- [x] Actions: `bracketList` / `bracketSubmit` (full-bracket upsert, editable until closeAt, lock re-check) / `adminFunCreateBracket` / `adminFunSettleBracket` (top score takes the reward in full, other scoring brackets get the consolation, zero pays nothing; `bracket` ledger kind; audits `game.bracketCreate` / `game.bracketSettle` in-transaction)
+- [x] Player `/brackets` (pick editor, revealed winners ✓/✗, my score, leaderboard) + admin `/admin/brackets` (creator + reveal & pay desk); games hub at 7 cards; registry `brackets` → `built: true` — **no `built: false` rows remain**
+- [x] E2E: create → submit/edit → settle verified with 3 throwaway users (6 pts → Ɱ200, 5 pts → Ɱ50), ledger + audits DB-confirmed; cleanup verified, books agree at Ɱ 31,674; prod deployed + spot-checked
 
 ## ⏳ Next: admin phase 2.2 — player money management (approved plan below)
 
