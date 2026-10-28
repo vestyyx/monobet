@@ -130,6 +130,15 @@ export async function requireUser(): Promise<CurrentUser> {
       throw new Error("Account suspended");
     }
   }
+  // Maintenance mode (Phase 6, /admin/settings): player writes stop at the
+  // same central gate; admins keep working so they can fix what's broken.
+  if (!isAdmin(u)) {
+    const [cfg] = await db
+      .select({ maintenance: schema.platformConfig.maintenance })
+      .from(schema.platformConfig)
+      .limit(1);
+    if (cfg?.maintenance) throw new Error("Site under maintenance");
+  }
   return u;
 }
 

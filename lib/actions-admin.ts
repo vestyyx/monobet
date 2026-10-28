@@ -60,6 +60,8 @@ import {
   deleteMarket,
   proposeMarket,
   resolveMarket,
+  setHouseRules,
+  setLeverageConfig,
 } from "@/lib/actions";
 
 export type AdjustResult = { ok: boolean; error?: string; deduped?: boolean };
@@ -1138,5 +1140,275 @@ export async function gigReverseShift(input: { shiftId: string; reason: string }
     return { ok: true };
   } catch (e) {
     return fail(e, "Reverse failed");
+  }
+}
+
+// ---------- Phase 6 — versioned house config + platform settings ----------
+//
+// Every audited save of the house knobs reuses the player-facing validation in
+// lib/actions.ts (same bounds, same write), then records the values being
+// overwritten as a config_version undo point. Rollbacks re-apply an undo point
+// through the same save path — history never forks, and each step lands on
+// the audit log.
+
+function knobMapFrom(cfg: typeof schema.casinoConfig.$inferSelect | null | undefined): Record<string, number> {
+  if (!cfg) return {};
+  return {
+    tradeMaxLev: cfg.tradeMaxLev,
+    levFeeBps: cfg.levFeeBps,
+    tradeMaxSpendCents: cfg.tradeMaxSpendCents,
+    tradeFeeCents: cfg.tradeFeeCents,
+    debtRateBps: cfg.debtRateBps,
+    referralRoyaltyBps: cfg.referralRoyaltyBps,
+    referralRoyaltyCapCents: cfg.referralRoyaltyCapCents,
+    minTradeCents: cfg.minTradeCents,
+  };
+}
+
+/** Current knob map — captured BEFORE a save so the version is an undo point. */
+async function captureKnobs() {
+  const [cfg] = await db.select().from(schema.casinoConfig).where(eq(schema.casinoConfig.id, "house")).limit(1);
+  return knobMapFrom(cfg);
+}
+
+/** Version row = the values as they were before the change (undo point). */
+async function writeVersion(adminId: string, adminName: string, note: string, map: Record<string, number>) {
+  await db.insert(schema.configVersion).values({
+    data: map,
+    changedBy: adminId,
+    changedByName: adminName,
+    note,
+  });
+}
+
+/** Audited leverage save — same bounds as the player-side action, versioned. */
+export async function adminSaveLeverageConfig(input: {
+  tradeMaxLev: number;
+  levFeeBps: number;
+  tradeMaxSpendCents: number;
+  reason: string;
+}): Promise<Phase3Result> {
+  let adminId = "";
+  let adminName = "";
+  try {
+    const admin = await assertRole("admin");
+    adminId = admin.id;
+    adminName = admin.username ?? "?";
+    const reason = (input.reason ?? "").trim();
+    if (!marketReasonOk(reason)) throw new Error(`Reason is required (at least ${MARKET_MIN_REASON} characters)`);
+    const before = await captureKnobs();
+    const r = await setLeverageConfig({
+      tradeMaxLev: input.tradeMaxLev,
+      levFeeBps: input.levFeeBps,
+      tradeMaxSpendCents: input.tradeMaxSpendCents,
+    });
+    if (!r.ok) return r;
+    await writeVersion(adminId, adminName, `leverage: ${reason}`, before);
+    await db.transaction(async (tx) => {
+      await audit(
+        tx,
+        adminId,
+        adminName,
+        "config.change",
+        "config",
+        "leverage",
+        reason,
+        { knobs: "leverage" },
+        { tradeMaxLev: input.tradeMaxLev, levFeeBps: input.levFeeBps, tradeMaxSpendCents: input.tradeMaxSpendCents }
+      );
+    });
+    revalidatePath("/admin/economy");
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "Config failed");
+  }
+}
+
+/** Audited house-rules save — same bounds as the player-side action, versioned. */
+export async function adminSaveHouseRules(input: {
+  tradeFeeCents: number;
+  debtRateBps: number;
+  referralRoyaltyBps: number;
+  referralRoyaltyCapCents: number;
+  minTradeCents: number;
+  reason: string;
+}): Promise<Phase3Result> {
+  let adminId = "";
+  let adminName = "";
+  try {
+    const admin = await assertRole("admin");
+    adminId = admin.id;
+    adminName = admin.username ?? "?";
+    const reason = (input.reason ?? "").trim();
+    if (!marketReasonOk(reason)) throw new Error(`Reason is required (at least ${MARKET_MIN_REASON} characters)`);
+    const before = await captureKnobs();
+    const r = await setHouseRules({
+      tradeFeeCents: input.tradeFeeCents,
+      debtRateBps: input.debtRateBps,
+      referralRoyaltyBps: input.referralRoyaltyBps,
+      referralRoyaltyCapCents: input.referralRoyaltyCapCents,
+      minTradeCents: input.minTradeCents,
+    });
+    if (!r.ok) return r;
+    await writeVersion(adminId, adminName, `house_rules: ${reason}`, before);
+    await db.transaction(async (tx) => {
+      await audit(
+        tx,
+        adminId,
+        adminName,
+        "config.change",
+        "config",
+        "house_rules",
+        reason,
+        { knobs: "house_rules" },
+        {
+          tradeFeeCents: input.tradeFeeCents,
+          debtRateBps: input.debtRateBps,
+          referralRoyaltyBps: input.referralRoyaltyBps,
+          referralRoyaltyCapCents: input.referralRoyaltyCapCents,
+          minTradeCents: input.minTradeCents,
+        }
+      );
+    });
+    revalidatePath("/admin/economy");
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "Config failed");
+  }
+}
+
+/** Roll a knob set back to a stored snapshot through the same save path. */
+export async function adminRollbackConfig(input: { versionId: string; reason: string }): Promise<Phase3Result> {
+  let adminId = "";
+  let adminName = "";
+  try {
+    const admin = await assertRole("admin");
+    adminId = admin.id;
+    adminName = admin.username ?? "?";
+    const reason = (input.reason ?? "").trim();
+    if (!marketReasonOk(reason)) throw new Error(`Reason is required (at least ${MARKET_MIN_REASON} characters)`);
+    const [v] = await db.select().from(schema.configVersion).where(eq(schema.configVersion.id, input.versionId)).limit(1);
+    if (!v) throw new Error("Config version not found");
+    const d = (v.data ?? {}) as Record<string, unknown>;
+    const num = (k: string, fallback: number) => {
+      const n = Number(d[k]);
+      return Number.isFinite(n) ? n : fallback;
+    };
+    // Capture the CURRENT values first — the rollback itself gets an undo
+    // point, so an accidental rollback can be rolled back the same way.
+    const current = await captureKnobs();
+    // A version stores the full knob map, so a rollback restores both halves
+    // through the standard save actions (validation + revalidation included).
+    const rl = await setLeverageConfig({
+      tradeMaxLev: num("tradeMaxLev", 1),
+      levFeeBps: num("levFeeBps", 0),
+      tradeMaxSpendCents: num("tradeMaxSpendCents", 1000),
+    });
+    if (!rl.ok) return rl;
+    const rr = await setHouseRules({
+      tradeFeeCents: num("tradeFeeCents", 0),
+      debtRateBps: num("debtRateBps", 0),
+      referralRoyaltyBps: num("referralRoyaltyBps", 0),
+      referralRoyaltyCapCents: num("referralRoyaltyCapCents", 0),
+      minTradeCents: num("minTradeCents", 0),
+    });
+    if (!rr.ok) return rr;
+    await writeVersion(adminId, adminName, `rollback: Rollback to ${v.createdAt.toISOString().slice(0, 16)} (${reason})`, current);
+    await db.transaction(async (tx) => {
+      await audit(tx, adminId, adminName, "config.rollback", "config", v.id, reason, { note: v.note }, { rolledBack: true });
+    });
+    revalidatePath("/admin/economy");
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "Rollback failed");
+  }
+}
+
+/**
+ * The /admin/settings write: registration switch, maintenance mode and the
+ * global announcement banner. Each section that actually changed gets its own
+ * audit row (before→after), all guarded by one reason. Admin-only — these
+ * switches shape what guests and every player can do.
+ */
+export async function adminSetSettings(input: {
+  registrationOpen?: boolean;
+  maintenance?: boolean;
+  annTitle?: string;
+  annBody?: string;
+  annLevel?: string;
+  annUntilDate?: string; // ISO string or "" to clear
+  reason: string;
+}): Promise<Phase3Result> {
+  let adminId = "";
+  let adminName = "";
+  try {
+    const admin = await assertRole("admin");
+    adminId = admin.id;
+    adminName = admin.username ?? "?";
+    const reason = (input.reason ?? "").trim();
+    if (!marketReasonOk(reason)) throw new Error(`Reason is required (at least ${MARKET_MIN_REASON} characters)`);
+
+    const [cur] = await db.select().from(schema.platformConfig).limit(1);
+    const before = {
+      registrationOpen: cur?.registrationOpen ?? true,
+      maintenance: cur?.maintenance ?? false,
+      annTitle: cur?.annTitle ?? "",
+      annBody: cur?.annBody ?? "",
+      annLevel: cur?.annLevel ?? "info",
+      annUntil: cur?.annUntil ? new Date(cur.annUntil).toISOString() : null,
+    };
+
+    const until = input.annUntilDate ? new Date(input.annUntilDate) : null;
+    if (until && Number.isNaN(until.getTime())) throw new Error("Bad date");
+
+    const level = input.annLevel === "warn" ? "warn" : "info";
+    const after = {
+      registrationOpen: typeof input.registrationOpen === "boolean" ? input.registrationOpen : before.registrationOpen,
+      maintenance: typeof input.maintenance === "boolean" ? input.maintenance : before.maintenance,
+      annTitle: input.annTitle !== undefined ? input.annTitle.trim() : before.annTitle,
+      annBody: input.annBody !== undefined ? input.annBody.trim() : before.annBody,
+      annLevel: level,
+      annUntil: input.annUntilDate !== undefined ? (until ? until.toISOString() : null) : before.annUntil,
+    };
+    if (after.annTitle.length > 120 || after.annBody.length > 500) throw new Error("Description too long");
+
+    await db
+      .insert(schema.platformConfig)
+      .values({
+        id: "platform",
+        ...after,
+        annUntil: until,
+        updatedBy: adminName,
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: schema.platformConfig.id,
+        set: { ...after, annUntil: until, updatedBy: adminName, updatedAt: new Date() },
+      });
+
+    // One audit row per section that actually changed.
+    await db.transaction(async (tx) => {
+      if (before.registrationOpen !== after.registrationOpen) {
+        await audit(tx, adminId, adminName, "settings.registration", "settings", "platform", reason, before, after);
+      }
+      if (before.maintenance !== after.maintenance) {
+        await audit(tx, adminId, adminName, "settings.maintenance", "settings", "platform", reason, before, after);
+      }
+      if (
+        before.annTitle !== after.annTitle ||
+        before.annBody !== after.annBody ||
+        before.annLevel !== after.annLevel ||
+        before.annUntil !== after.annUntil
+      ) {
+        await audit(tx, adminId, adminName, "settings.announcement", "settings", "platform", reason, before, after);
+      }
+    });
+
+    revalidatePath("/admin/settings");
+    revalidatePath("/login");
+    revalidatePath("/"); // banner
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "Settings failed");
   }
 }

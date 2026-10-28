@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { username } from "better-auth/plugins";
+import { username, } from "better-auth/plugins";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
 import { db, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
@@ -49,6 +50,19 @@ export const auth = betterAuth({
   // Bans are read-only, not lockouts: suspended users still sign in and
   // browse; every mutating action rejects them via requireUser.
   plugins: [username(), nextCookies()],
+  // Registration switch (Phase 6, /admin/settings) — a soft server hook that
+  // rejects sign-ups while the switch is closed; members keep signing in.
+  hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path.startsWith("/sign-up")) {
+        const [cfg] = await db
+          .select({ registrationOpen: schema.platformConfig.registrationOpen })
+          .from(schema.platformConfig)
+          .limit(1);
+        if (cfg && !cfg.registrationOpen) throw new APIError("FORBIDDEN", { message: "Registration is closed" });
+      }
+    }),
+  },
   databaseHooks: {
     user: {
       create: {
