@@ -1,426 +1,433 @@
 {
-  "version": "7",
-  "dialect": "postgresql",
-  "entries": [
-    {
-      "idx": 0,
-      "version": "7",
-      "when": 1790670758022,
-      "tag": "0000_init",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1790671097174,
-      "tag": "0001_liquidity-default",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1790674343790,
-      "tag": "0002_multi-outcome",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1790674809398,
-      "tag": "0003_option-sort",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1790675270273,
-      "tag": "0004_categories",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1790678000000,
-      "tag": "0005_market-images",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1790679634362,
-      "tag": "0006_rewards",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1790684765530,
-      "tag": "0007_user-bans",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1790684771069,
-      "tag": "0008_purge-seed-categories",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "7",
-      "when": 1790687228774,
-      "tag": "0009_position-debt",
-      "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "7",
-      "when": 1790688180050,
-      "tag": "0010_retention",
-      "breakpoints": true
-    },
-    {
-      "idx": 11,
-      "version": "7",
-      "when": 1790688467110,
-      "tag": "0011_watchlist",
-      "breakpoints": true
-    },
-    {
-      "idx": 12,
-      "version": "7",
-      "when": 1790689924403,
-      "tag": "0012_community-resolution",
-      "breakpoints": true
-    },
-    {
-      "idx": 13,
-      "version": "7",
-      "when": 1790690241392,
-      "tag": "0013_duels",
-      "breakpoints": true
-    },
-    {
-      "idx": 14,
-      "version": "7",
-      "when": 1790690466976,
-      "tag": "0014_social-depth",
-      "breakpoints": true
-    },
-    {
-      "idx": 15,
-      "version": "7",
-      "when": 1790692192767,
-      "tag": "0015_squad-invite",
-      "breakpoints": true
-    },
-    {
-      "idx": 16,
-      "version": "7",
-      "when": 1790692782690,
-      "tag": "0016_max-leverage",
-      "breakpoints": true
-    },
-    {
-      "idx": 17,
-      "version": "7",
-      "when": 1790694337026,
-      "tag": "0017_market-likes",
-      "breakpoints": true
-    },
-    {
-      "idx": 18,
-      "version": "7",
-      "when": 1790698379092,
-      "tag": "0018_mod-and-badges",
-      "breakpoints": true
-    },
-    {
-      "idx": 19,
-      "version": "7",
-      "when": 1790701198000,
-      "tag": "0019_market-context",
-      "breakpoints": true
-    },
-    {
-      "idx": 20,
-      "version": "7",
-      "when": 1790714205000,
-      "tag": "0020_market-aliases",
-      "breakpoints": true
-    },
-    {
-      "idx": 21,
-      "version": "7",
-      "when": 1790719056000,
-      "tag": "0021_user-debt",
-      "breakpoints": true
-    },
-    {
-      "idx": 22,
-      "version": "7",
-      "when": 1790757393000,
-      "tag": "0022_notes-and-blackjack",
-      "breakpoints": true
-    },
-    {
-      "idx": 23,
-      "version": "7",
-      "when": 1790759646000,
-      "tag": "0023_opens_at",
-      "breakpoints": true
-    },
-    {
-      "idx": 24,
-      "version": "7",
-      "when": 1790769476000,
-      "tag": "0024_wall",
-      "breakpoints": true
-    },
-    {
-      "idx": 25,
-      "version": "7",
-      "when": 1790772554000,
-      "tag": "0025_wall_miracle",
-      "breakpoints": true
-    },
-    {
-      "idx": 26,
-      "version": "7",
-      "when": 1790774321000,
-      "tag": "0026_bj_sides",
-      "breakpoints": true
-    },
-    {
-      "idx": 27,
-      "version": "7",
-      "when": 1790789360000,
-      "tag": "0027_group_shared_book",
-      "breakpoints": true
-    },
-    {
-      "idx": 28,
-      "version": "7",
-      "when": 1790799117000,
-      "tag": "0028_activity_streak",
-      "breakpoints": true
-    },
-    {
-      "idx": 29,
-      "version": "7",
-      "when": 1790800660000,
-      "tag": "0029_duel_games",
-      "breakpoints": true
-    },
-    {
-      "idx": 30,
-      "version": "7",
-      "when": 1790802631000,
-      "tag": "0030_casino_tuning",
-      "breakpoints": true
-    },
-    {
-      "idx": 31,
-      "version": "7",
-      "when": 1790809458000,
-      "tag": "0031_jackpot",
-      "breakpoints": true
-    },
-    {
-      "idx": 32,
-      "version": "7",
-      "when": 1790841154000,
-      "tag": "0032_timer_round",
-      "breakpoints": true
-    },
-    {
-      "idx": 33,
-      "version": "7",
-      "when": 1790841154000,
-      "tag": "0033_game_session",
-      "breakpoints": true
-    },
-    {
-      "idx": 34,
-      "version": "7",
-      "when": 1790842088000,
-      "tag": "0034_balance_bigint",
-      "breakpoints": true
-    },
-    {
-      "idx": 35,
-      "version": "7",
-      "when": 1790852214000,
-      "tag": "0035_timer_jitter",
-      "breakpoints": true
-    },
-    {
-      "idx": 36,
-      "version": "7",
-      "when": 1790852214001,
-      "tag": "0036_game_kill_switch",
-      "breakpoints": true
-    },
-    {
-      "idx": 37,
-      "version": "7",
-      "when": 1790852214002,
-      "tag": "0037_hilo_round",
-      "breakpoints": true
-    },
-    {
-      "idx": 38,
-      "version": "7",
-      "when": 1790852214003,
-      "tag": "0038_timer_started_at",
-      "breakpoints": true
-    },
-    {
-      "idx": 39,
-      "version": "7",
-      "when": 1790852508417,
-      "tag": "0039_reconcile",
-      "breakpoints": true
-    },
-    {
-      "idx": 40,
-      "version": "7",
-      "when": 1790855673911,
-      "tag": "0040_stats_since",
-      "breakpoints": true
-    },
-    {
-      "idx": 41,
-      "version": "7",
-      "when": 1790856438789,
-      "tag": "0041_market_seed",
-      "breakpoints": true
-    },
-    {
-      "idx": 42,
-      "version": "7",
-      "when": 1790868020003,
-      "tag": "0042_squad_money",
-      "breakpoints": true
-    },
-    {
-      "idx": 43,
-      "version": "7",
-      "when": 1790870504795,
-      "tag": "0043_daily_cap",
-      "breakpoints": true
-    },
-    {
-      "idx": 44,
-      "version": "7",
-      "when": 1790873216592,
-      "tag": "0044_tpsl",
-      "breakpoints": true
-    },
-    {
-      "idx": 45,
-      "version": "7",
-      "when": 1790878608970,
-      "tag": "0045_sellpct",
-      "breakpoints": true
-    },
-    {
-      "idx": 46,
-      "version": "7",
-      "when": 1790926986378,
-      "tag": "0046_levcfg",
-      "breakpoints": true
-    },
-    {
-      "idx": 47,
-      "version": "7",
-      "when": 1790929990974,
-      "tag": "0047_betcaps",
-      "breakpoints": true
-    },
-    {
-      "idx": 48,
-      "version": "7",
-      "when": 1790932041322,
-      "tag": "0048_houserules",
-      "breakpoints": true
-    },
-    {
-      "idx": 49,
-      "version": "7",
-      "when": 1792413871860,
-      "tag": "0049_jobs",
-      "breakpoints": true
-    },
-    {
-      "idx": 50,
-      "version": "7",
-      "when": 1792691730982,
-      "tag": "0050_phase1-no-casino",
-      "breakpoints": true
-    },
-    {
-      "idx": 51,
-      "version": "7",
-      "when": 1792692288189,
-      "tag": "0051_phase2-admin-core",
-      "breakpoints": true
-    },
-    {
-      "idx": 52,
-      "version": "7",
-      "when": 1792693519760,
-      "tag": "0052_fun-games-batch1",
-      "breakpoints": true
-    },
-    {
-      "idx": 53,
-      "version": "7",
-      "when": 1792864015304,
-      "tag": "0053_fun-games-batch2",
-      "breakpoints": true
-    },
-    {
-      "idx": 54,
-      "version": "7",
-      "when": 1792866947295,
-      "tag": "0054_fun-games-batch3",
-      "breakpoints": true
-    },
-    {
-      "idx": 55,
-      "version": "7",
-      "when": 1792910459289,
-      "tag": "0055_admin-money",
-      "breakpoints": true
-    },
-    {
-      "idx": 56,
-      "version": "7",
-      "when": 1792960943346,
-      "tag": "0056_users-groups",
-      "breakpoints": true
-    },
-    {
-      "idx": 57,
-      "version": "7",
-      "when": 1793131863786,
-      "tag": "0057_moderation-blocklist",
-      "breakpoints": true
-    },
-    {
-      "idx": 58,
-      "version": "7",
-      "when": 1793134053925,
-      "tag": "0058_gig-config",
-      "breakpoints": true
-    },
-    {
-      "idx": 59,
-      "version": "7",
-      "when": 1793136331352,
-      "tag": "0059_platform-config",
-      "breakpoints": true
-    }
-  ]
+	"version": "7",
+	"dialect": "postgresql",
+	"entries": [
+		{
+			"idx": 0,
+			"version": "7",
+			"when": 1790670758022,
+			"tag": "0000_init",
+			"breakpoints": true
+		},
+		{
+			"idx": 1,
+			"version": "7",
+			"when": 1790671097174,
+			"tag": "0001_liquidity-default",
+			"breakpoints": true
+		},
+		{
+			"idx": 2,
+			"version": "7",
+			"when": 1790674343790,
+			"tag": "0002_multi-outcome",
+			"breakpoints": true
+		},
+		{
+			"idx": 3,
+			"version": "7",
+			"when": 1790674809398,
+			"tag": "0003_option-sort",
+			"breakpoints": true
+		},
+		{
+			"idx": 4,
+			"version": "7",
+			"when": 1790675270273,
+			"tag": "0004_categories",
+			"breakpoints": true
+		},
+		{
+			"idx": 5,
+			"version": "7",
+			"when": 1790678000000,
+			"tag": "0005_market-images",
+			"breakpoints": true
+		},
+		{
+			"idx": 6,
+			"version": "7",
+			"when": 1790679634362,
+			"tag": "0006_rewards",
+			"breakpoints": true
+		},
+		{
+			"idx": 7,
+			"version": "7",
+			"when": 1790684765530,
+			"tag": "0007_user-bans",
+			"breakpoints": true
+		},
+		{
+			"idx": 8,
+			"version": "7",
+			"when": 1790684771069,
+			"tag": "0008_purge-seed-categories",
+			"breakpoints": true
+		},
+		{
+			"idx": 9,
+			"version": "7",
+			"when": 1790687228774,
+			"tag": "0009_position-debt",
+			"breakpoints": true
+		},
+		{
+			"idx": 10,
+			"version": "7",
+			"when": 1790688180050,
+			"tag": "0010_retention",
+			"breakpoints": true
+		},
+		{
+			"idx": 11,
+			"version": "7",
+			"when": 1790688467110,
+			"tag": "0011_watchlist",
+			"breakpoints": true
+		},
+		{
+			"idx": 12,
+			"version": "7",
+			"when": 1790689924403,
+			"tag": "0012_community-resolution",
+			"breakpoints": true
+		},
+		{
+			"idx": 13,
+			"version": "7",
+			"when": 1790690241392,
+			"tag": "0013_duels",
+			"breakpoints": true
+		},
+		{
+			"idx": 14,
+			"version": "7",
+			"when": 1790690466976,
+			"tag": "0014_social-depth",
+			"breakpoints": true
+		},
+		{
+			"idx": 15,
+			"version": "7",
+			"when": 1790692192767,
+			"tag": "0015_squad-invite",
+			"breakpoints": true
+		},
+		{
+			"idx": 16,
+			"version": "7",
+			"when": 1790692782690,
+			"tag": "0016_max-leverage",
+			"breakpoints": true
+		},
+		{
+			"idx": 17,
+			"version": "7",
+			"when": 1790694337026,
+			"tag": "0017_market-likes",
+			"breakpoints": true
+		},
+		{
+			"idx": 18,
+			"version": "7",
+			"when": 1790698379092,
+			"tag": "0018_mod-and-badges",
+			"breakpoints": true
+		},
+		{
+			"idx": 19,
+			"version": "7",
+			"when": 1790701198000,
+			"tag": "0019_market-context",
+			"breakpoints": true
+		},
+		{
+			"idx": 20,
+			"version": "7",
+			"when": 1790714205000,
+			"tag": "0020_market-aliases",
+			"breakpoints": true
+		},
+		{
+			"idx": 21,
+			"version": "7",
+			"when": 1790719056000,
+			"tag": "0021_user-debt",
+			"breakpoints": true
+		},
+		{
+			"idx": 22,
+			"version": "7",
+			"when": 1790757393000,
+			"tag": "0022_notes-and-blackjack",
+			"breakpoints": true
+		},
+		{
+			"idx": 23,
+			"version": "7",
+			"when": 1790759646000,
+			"tag": "0023_opens_at",
+			"breakpoints": true
+		},
+		{
+			"idx": 24,
+			"version": "7",
+			"when": 1790769476000,
+			"tag": "0024_wall",
+			"breakpoints": true
+		},
+		{
+			"idx": 25,
+			"version": "7",
+			"when": 1790772554000,
+			"tag": "0025_wall_miracle",
+			"breakpoints": true
+		},
+		{
+			"idx": 26,
+			"version": "7",
+			"when": 1790774321000,
+			"tag": "0026_bj_sides",
+			"breakpoints": true
+		},
+		{
+			"idx": 27,
+			"version": "7",
+			"when": 1790789360000,
+			"tag": "0027_group_shared_book",
+			"breakpoints": true
+		},
+		{
+			"idx": 28,
+			"version": "7",
+			"when": 1790799117000,
+			"tag": "0028_activity_streak",
+			"breakpoints": true
+		},
+		{
+			"idx": 29,
+			"version": "7",
+			"when": 1790800660000,
+			"tag": "0029_duel_games",
+			"breakpoints": true
+		},
+		{
+			"idx": 30,
+			"version": "7",
+			"when": 1790802631000,
+			"tag": "0030_casino_tuning",
+			"breakpoints": true
+		},
+		{
+			"idx": 31,
+			"version": "7",
+			"when": 1790809458000,
+			"tag": "0031_jackpot",
+			"breakpoints": true
+		},
+		{
+			"idx": 32,
+			"version": "7",
+			"when": 1790841154000,
+			"tag": "0032_timer_round",
+			"breakpoints": true
+		},
+		{
+			"idx": 33,
+			"version": "7",
+			"when": 1790841154000,
+			"tag": "0033_game_session",
+			"breakpoints": true
+		},
+		{
+			"idx": 34,
+			"version": "7",
+			"when": 1790842088000,
+			"tag": "0034_balance_bigint",
+			"breakpoints": true
+		},
+		{
+			"idx": 35,
+			"version": "7",
+			"when": 1790852214000,
+			"tag": "0035_timer_jitter",
+			"breakpoints": true
+		},
+		{
+			"idx": 36,
+			"version": "7",
+			"when": 1790852214001,
+			"tag": "0036_game_kill_switch",
+			"breakpoints": true
+		},
+		{
+			"idx": 37,
+			"version": "7",
+			"when": 1790852214002,
+			"tag": "0037_hilo_round",
+			"breakpoints": true
+		},
+		{
+			"idx": 38,
+			"version": "7",
+			"when": 1790852214003,
+			"tag": "0038_timer_started_at",
+			"breakpoints": true
+		},
+		{
+			"idx": 39,
+			"version": "7",
+			"when": 1790852508417,
+			"tag": "0039_reconcile",
+			"breakpoints": true
+		},
+		{
+			"idx": 40,
+			"version": "7",
+			"when": 1790855673911,
+			"tag": "0040_stats_since",
+			"breakpoints": true
+		},
+		{
+			"idx": 41,
+			"version": "7",
+			"when": 1790856438789,
+			"tag": "0041_market_seed",
+			"breakpoints": true
+		},
+		{
+			"idx": 42,
+			"version": "7",
+			"when": 1790868020003,
+			"tag": "0042_squad_money",
+			"breakpoints": true
+		},
+		{
+			"idx": 43,
+			"version": "7",
+			"when": 1790870504795,
+			"tag": "0043_daily_cap",
+			"breakpoints": true
+		},
+		{
+			"idx": 44,
+			"version": "7",
+			"when": 1790873216592,
+			"tag": "0044_tpsl",
+			"breakpoints": true
+		},
+		{
+			"idx": 45,
+			"version": "7",
+			"when": 1790878608970,
+			"tag": "0045_sellpct",
+			"breakpoints": true
+		},
+		{
+			"idx": 46,
+			"version": "7",
+			"when": 1790926986378,
+			"tag": "0046_levcfg",
+			"breakpoints": true
+		},
+		{
+			"idx": 47,
+			"version": "7",
+			"when": 1790929990974,
+			"tag": "0047_betcaps",
+			"breakpoints": true
+		},
+		{
+			"idx": 48,
+			"version": "7",
+			"when": 1790932041322,
+			"tag": "0048_houserules",
+			"breakpoints": true
+		},
+		{
+			"idx": 49,
+			"version": "7",
+			"when": 1792413871860,
+			"tag": "0049_jobs",
+			"breakpoints": true
+		},
+		{
+			"idx": 50,
+			"version": "7",
+			"when": 1792691730982,
+			"tag": "0050_phase1-no-casino",
+			"breakpoints": true
+		},
+		{
+			"idx": 51,
+			"version": "7",
+			"when": 1792692288189,
+			"tag": "0051_phase2-admin-core",
+			"breakpoints": true
+		},
+		{
+			"idx": 52,
+			"version": "7",
+			"when": 1792693519760,
+			"tag": "0052_fun-games-batch1",
+			"breakpoints": true
+		},
+		{
+			"idx": 53,
+			"version": "7",
+			"when": 1792864015304,
+			"tag": "0053_fun-games-batch2",
+			"breakpoints": true
+		},
+		{
+			"idx": 54,
+			"version": "7",
+			"when": 1792866947295,
+			"tag": "0054_fun-games-batch3",
+			"breakpoints": true
+		},
+		{
+			"idx": 55,
+			"version": "7",
+			"when": 1792910459289,
+			"tag": "0055_admin-money",
+			"breakpoints": true
+		},
+		{
+			"idx": 56,
+			"version": "7",
+			"when": 1792960943346,
+			"tag": "0056_users-groups",
+			"breakpoints": true
+		},
+		{
+			"idx": 57,
+			"version": "7",
+			"when": 1793131863786,
+			"tag": "0057_moderation-blocklist",
+			"breakpoints": true
+		},
+		{
+			"idx": 58,
+			"version": "7",
+			"when": 1793134053925,
+			"tag": "0058_gig-config",
+			"breakpoints": true
+		},
+		{
+			"idx": 59,
+			"version": "7",
+			"when": 1793136331352,
+			"tag": "0059_platform-config",
+			"breakpoints": true
+		},
+		{
+			"idx": 60,
+			"version": "7",
+			"when": 1793190069526,
+			"tag": "0060_bracket",
+			"breakpoints": true
+		}
+	]
 }

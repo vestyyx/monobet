@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { Brain, Target, Sparkles, MessageCircleQuestion, Compass, ImageIcon, ArrowRight, PartyPopper } from "lucide-react";
+import { Brain, Target, Sparkles, MessageCircleQuestion, Compass, ImageIcon, ArrowRight, PartyPopper, Trophy } from "lucide-react";
 import { getCurrentUser, isAdmin } from "@/lib/session";
 import { getLang } from "@/lib/lang-server";
 import { getT } from "@/lib/i18n";
@@ -56,6 +56,12 @@ export default async function GamesPage() {
       Icon: ImageIcon,
       title: t.gamesPhotoTitle,
       desc: t.gamesPhotoDesc,
+    },
+    {
+      href: "/brackets",
+      Icon: Trophy,
+      title: t.gamesBracketTitle,
+      desc: t.gamesBracketDesc,
     },
   ];
 

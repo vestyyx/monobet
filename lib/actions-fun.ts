@@ -31,6 +31,12 @@ import {
   TRIVIA_REWARD_BY_DIFFICULTY,
   POLL_REWARD_CENTS,
   EMOJI_REWARD_CENTS,
+  BRACKET_REWARD_CENTS,
+  BRACKET_CONSOLATION_CENTS,
+  BRACKET_PICK_MAX,
+  parseBracketMatches,
+  bracketScore,
+  type BracketMatch,
 } from "@/lib/fun";
 
 // ---------- audit ----------
@@ -1179,5 +1185,196 @@ export async function adminFunCreatePhotoRound(input: {
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Could not publish the photo" };
+  }
+}
+
+// ============================================================
+// Bracket pools — "tipovačky pavouků" (family games, batch 4)
+// ============================================================
+
+export type BracketLeaderboardRow = { username: string; score: number; rewardCents: number };
+
+export type BracketRow = {
+  id: string;
+  title: string;
+  closeAt: string | Date;
+  status: "open" | "settled";
+  matches: BracketMatch[];
+  results: string[] | null; // revealed winners once settled
+  entryCount: number;
+  myPicks: Record<string, string> | null;
+  myScore: number | null;
+  myRewardCents: number | null;
+  rewardCents: number;
+  consolationCents: number;
+  leaderboard: BracketLeaderboardRow[];
+};
+
+export async function bracketList(limit = 10): Promise<BracketRow[]> {
+  const lang: Lang = await getLang();
+  const u = await requireUser();
+
+  const pools = await db.select().from(schema.bracketPool).orderBy(desc(schema.bracketPool.createdAt)).limit(limit);
+  const ids = pools.map((p) => p.id);
+  const picks = ids.length
+    ? await db
+        .select({
+          poolId: schema.bracketPick.poolId,
+          userId: schema.bracketPick.userId,
+          picks: schema.bracketPick.picks,
+          score: schema.bracketPick.score,
+          rewardCents: schema.bracketPick.rewardCents,
+          username: schema.user.username,
+        })
+        .from(schema.bracketPick)
+        .innerJoin(schema.user, eq(schema.bracketPick.userId, schema.user.id))
+        .where(sql`${schema.bracketPick.poolId} in (${sql.join(ids.map((i) => sql`${i}`), sql`, `)})`)
+    : [];
+
+  return pools.map((p) => {
+    const mine = picks.find((x) => x.poolId === p.id && x.userId === u.id);
+    const settled = p.status === "settled";
+    const board = picks
+      .filter((x) => x.poolId === p.id)
+      .map((x) => ({ username: x.username ?? "?", score: x.score, rewardCents: x.rewardCents }))
+      .sort((a, b) => b.score - a.score || a.username.localeCompare(b.username));
+    return {
+      id: p.id,
+      title: lang === "cs" ? p.titleCs : p.titleEn,
+      closeAt: p.closeAt,
+      status: (p.status as "open" | "settled") ?? "open",
+      matches: (p.matches as BracketMatch[]) ?? [],
+      results: settled ? ((p.results as string[]) ?? []) : null,
+      entryCount: picks.filter((x) => x.poolId === p.id).length,
+      myPicks: mine ? ((mine.picks as Record<string, string>) ?? {}) : null,
+      myScore: mine ? mine.score : null,
+      myRewardCents: mine ? mine.rewardCents : null,
+      rewardCents: p.rewardCents,
+      consolationCents: p.consolationCents,
+      leaderboard: settled ? board.slice(0, 20) : [],
+    };
+  });
+}
+
+// Submit (or re-edit) the full bracket. One row per player per pool via the
+// unique index; freely editable until closeAt locks the picks.
+export async function bracketSubmit(poolId: string, picksRaw: Record<string, string>): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const u = await requireUser();
+    if (u.frozenAt) throw new Error("Account frozen");
+
+    const [pool] = await db.select().from(schema.bracketPool).where(eq(schema.bracketPool.id, poolId)).limit(1);
+    if (!pool) throw new Error("Bracket not found");
+    if (!funRoundOpen(pool.status, pool.closeAt)) throw new Error("This bracket is closed");
+    const matches = (pool.matches as BracketMatch[]) ?? [];
+
+    const picks: Record<string, string> = {};
+    for (let i = 0; i < matches.length; i++) {
+      const pick = (picksRaw?.[String(i)] ?? "").trim().slice(0, BRACKET_PICK_MAX);
+      if (!pick) throw new Error("Fill in a winner for every match");
+      picks[String(i)] = pick;
+    }
+
+    await db.transaction(async (tx) => {
+      // Re-check under lock — the deadline can pass mid-save.
+      const [r] = await tx.select().from(schema.bracketPool).where(eq(schema.bracketPool.id, pool.id)).for("update").limit(1);
+      if (!r || !funRoundOpen(r.status, r.closeAt)) throw new Error("This bracket is closed");
+      await tx
+        .insert(schema.bracketPick)
+        .values({ poolId: pool.id, userId: u.id, picks })
+        .onConflictDoUpdate({ target: [schema.bracketPick.poolId, schema.bracketPick.userId], set: { picks, updatedAt: new Date() } });
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Could not save your picks" };
+  }
+}
+
+// Open a new bracket pool. Matches come from a textarea, one per line:
+// "QF1 — Sparta vs Slavia | 2" (points optional, default 1).
+export async function adminFunCreateBracket(input: {
+  titleCs: string;
+  titleEn: string;
+  closeInHours: number;
+  rewardMonos: number;
+  consolationMonos: number;
+  matchesRaw: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const admin = await assertRole("moderator");
+    const titleCs = input.titleCs?.trim();
+    const titleEn = input.titleEn?.trim();
+    if (!titleCs || !titleEn) throw new Error("Write the title in both languages");
+    const matches = parseBracketMatches(input.matchesRaw ?? "");
+    if (matches.length < 2) throw new Error("List at least 2 matches (one per line)");
+    const hours = Math.max(1, Math.min(24 * 365, Math.round(Number(input.closeInHours) || 168)));
+    const reward = Math.max(0, Math.round((Number(input.rewardMonos) || 200) * 100));
+    const cons = Math.max(0, Math.round((Number(input.consolationMonos) || 50) * 100));
+
+    await db.transaction(async (tx) => {
+      await tx.insert(schema.bracketPool).values({
+        titleCs: titleCs!,
+        titleEn: titleEn!,
+        closeAt: new Date(Date.now() + hours * 3_600_000),
+        rewardCents: reward,
+        consolationCents: cons,
+        matches,
+        createdBy: admin.id,
+      });
+      await audit(tx, admin.id, admin.username ?? "admin", "game.bracketCreate", "bracket_pool", "", titleCs ?? "");
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Could not open the bracket pool" };
+  }
+}
+
+// Settle a bracket pool: the admin reveals the real winner of every match
+// (one per line, same order as the match list). Scoring brackets get paid —
+// the top score wins in full, other scoring brackets get the consolation
+// token. Nobody with a 0-score bracket is paid.
+export async function adminFunSettleBracket(poolId: string, winnersRaw: string): Promise<{ ok: boolean; error?: string; paid?: number }> {
+  try {
+    const admin = await assertRole("moderator");
+    let paid = 0;
+    await db.transaction(async (tx) => {
+      const [p] = await tx.select().from(schema.bracketPool).where(eq(schema.bracketPool.id, poolId)).for("update").limit(1);
+      if (!p) throw new Error("Bracket not found");
+      if (p.status === "settled") throw new Error("Already settled");
+      const matches = (p.matches as BracketMatch[]) ?? [];
+
+      const winners = (winnersRaw ?? "")
+        .split(/\r?\n/)
+        .map((l) => l.trim().slice(0, 60))
+        .filter(Boolean);
+      if (winners.length !== matches.length) throw new Error("Reveal a winner for every match (one per line)");
+
+      const entries = await tx.select().from(schema.bracketPick).where(eq(schema.bracketPick.poolId, p.id)).for("update");
+      const winReward = p.rewardCents > 0 ? p.rewardCents : BRACKET_REWARD_CENTS;
+      const consReward = Math.max(0, p.consolationCents ?? BRACKET_CONSOLATION_CENTS);
+
+      const scored = entries.map((e) => ({ e, score: bracketScore((e.picks as Record<string, string>) ?? {}, winners, matches) }));
+      const top = Math.max(0, ...scored.map((s) => s.score));
+
+      await tx.update(schema.bracketPool).set({ status: "settled", results: winners, settledBy: admin.id }).where(eq(schema.bracketPool.id, p.id));
+
+      for (const { e, score } of scored) {
+        const isTop = score > 0 && score === top;
+        const amt = isTop ? winReward : score > 0 ? consReward : 0;
+        if (amt <= 0) {
+          await tx.update(schema.bracketPick).set({ score }).where(eq(schema.bracketPick.id, e.id));
+          continue;
+        }
+        await lockUser(tx, e.userId);
+        await credit(tx, e.userId, amt, "bracket", null, isTop ? "Bracket pool — the sharpest bracket" : "Bracket pool — consolation for the near-misses");
+        await tx.update(schema.bracketPick).set({ score, rewardCents: amt }).where(eq(schema.bracketPick.id, e.id));
+        paid += amt;
+      }
+
+      await audit(tx, admin.id, admin.username ?? "admin", "game.bracketSettle", "bracket_pool", p.id, `winners: ${winners.join(", ")}`);
+    });
+    return { ok: true, paid };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Could not settle the bracket" };
   }
 }

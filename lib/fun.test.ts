@@ -11,6 +11,8 @@ import {
   emojiAttemptsLeft,
   questProofNoteOk,
   photoDataUrlOk,
+  parseBracketMatches,
+  bracketScore,
 } from "./fun";
 
 describe("funStreakMultiplier", () => {
@@ -119,5 +121,47 @@ describe("batch 3 helpers", () => {
     expect(photoDataUrlOk("data:text/html;base64,PGI+")).toBe(false);
     expect(photoDataUrlOk("https://example.com/cat.jpg")).toBe(false);
     expect(photoDataUrlOk("data:image/jpeg;base64," + "A".repeat(400_001))).toBe(false);
+  });
+});
+
+describe("bracket pools", () => {
+  const matches = [
+    { label: "QF1 — Sparta vs Slavia", points: 1 },
+    { label: "QF2 — Plzeň vs Baník", points: 2 },
+    { label: "Final", points: 5 },
+  ];
+
+  it("parses 'label | points' lines with a default of 1 point", () => {
+    expect(parseBracketMatches("QF1 | 2\nFinal")).toEqual([
+      { label: "QF1", points: 2 },
+      { label: "Final", points: 1 },
+    ]);
+  });
+
+  it("ignores empty lines and clamps absurd point values", () => {
+    const parsed = parseBracketMatches("  \nA | 0\nB | 1000\n C ");
+    expect(parsed).toEqual([
+      { label: "A", points: 1 },
+      { label: "B", points: 100 },
+      { label: "C", points: 1 },
+    ]);
+  });
+
+  it("caps the match count at the family-scale limit", () => {
+    const many = Array.from({ length: 80 }, (_, i) => `M${i}`).join("\n");
+    expect(parseBracketMatches(many)).toHaveLength(64);
+  });
+
+  it("labels without a numeric tail keep their pipes", () => {
+    expect(parseBracketMatches("Winner | of cups")).toEqual([{ label: "Winner | of cups", points: 1 }]);
+  });
+
+  it("scores normalized hits with their match points", () => {
+    expect(bracketScore({ "0": "Sparta", "1": "plzeň!", "2": "Baník" }, ["sparta", "Plzeň", "BANÍK"], matches)).toBe(8);
+  });
+
+  it("missing or empty picks never score", () => {
+    expect(bracketScore({}, ["Sparta", "Plzeň", "Baník"], matches)).toBe(0);
+    expect(bracketScore({ "0": "", "1": "  ", "2": "?" }, ["Sparta", "Plzeň", "Baník"], matches)).toBe(0);
   });
 });
