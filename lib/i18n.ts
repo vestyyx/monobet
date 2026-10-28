@@ -1343,7 +1343,7 @@ const en = {
 
   // ---------- Phase 5 — economy ----------
   econTitle: "House & economy",
-  econSub: "What the house banked and the knobs that shape it. Versioned config, exports and reconciliation arrive in Phase 6.",
+  econSub: "What the house banked, its knobs, plus the books check, abnormal-earning alerts and config snapshots.",
 
   // ---------- Phase 5 — duels desk on /admin/moderation ----------
   admModDuelsTitle: "Duels",
@@ -1355,6 +1355,53 @@ const en = {
   // ---------- Phase 5 — create-user on /admin/players ----------
   admPlayersCreateTitle: "Create an account",
   admPlayersCreateSub: "A hand-crafted account for the family — nobody has to fight the sign-up form.",
+
+  // ---------- Phase 6 — platform settings (/admin/settings) ----------
+  admSetTitle: "Platform settings",
+  admSetSub: "Registration switch, maintenance mode and the family announcement — every change lands on the audit log with a reason.",
+  admSetReg: "Registration",
+  admSetRegOpen: "Open — anyone may join",
+  admSetRegClosed: "Closed — members only",
+  admSetRegNote: "While closed, sign-ups are refused and the login form carries a note.",
+  admSetMaint: "Maintenance mode",
+  admSetMaintOff: "Off",
+  admSetMaintOn: "On — admins only",
+  admSetMaintNote: "Player actions pause at the central gate; admins keep working so they can fix what's broken.",
+  admSetAnn: "Announcement banner",
+  admSetAnnTitlePh: "Title — empty hides the banner",
+  admSetAnnBodyPh: "Extra text (optional)",
+  admSetAnnLevel: "Style",
+  admSetAnnInfo: "Info",
+  admSetAnnWarn: "Alert",
+  admSetAnnUntil: "Active until (empty = forever)",
+  admSetAnnNote: "Shows site-wide above the header until its date passes.",
+  admSetChangeNote: "Reason (audit)",
+  admSetSave: "Save settings",
+  admSetSaved: "Settings saved",
+  admSetLastChanged: (who: string, when: string) => `Last changed by ${who} · ${when}`,
+  admSetVersionsNote: "Economy-knob undo points and rollback live on the economy desk.",
+  bannerMaint: "Maintenance — player actions are paused for a moment",
+  regClosedNote: "Registration is closed right now — members can still sign in.",
+
+  // ---------- Phase 6 — economy: books check, alerts, exports, versions ----------
+  econReconTitle: "Books check",
+  econReconNote: "Every Mony movement is born a ledger row, so Σ ledger must equal Σ balances.",
+  econReconOk: "Books agree Ɱ-for-Ɱ",
+  econReconOff: (m: string) => `Books drift by ${m}`,
+  econReconLedger: "Σ ledger:",
+  econReconBalances: "Σ balances:",
+  econReconUser: "Player",
+  econReconDriftAcc: "Drift",
+  econExLedger: "Ledger CSV",
+  econExBalances: "Balances CSV",
+  econAlerts: "Abnormal earnings",
+  econAlertsItem: "in 7 days — worth a look",
+  econAlertsQuiet: "Nothing unusual — no outlier earnings in the last 7 days.",
+  econVersions: "Config undo points",
+  econVersionsNote: "The knob values each audited save overwrote; roll one back to undo that change.",
+  econVersionsEmpty: "No undo points yet — save a config first.",
+  econRollback: "Roll back",
+  econRollbackDone: "Config rolled back",
 };
 
 export type Dict = typeof en;
@@ -2670,7 +2717,7 @@ const cs: Dict = {
 
   // ---------- Fáze 5 — ekonomika ----------
   econTitle: "Pokladna a ekonomika",
-  econSub: "Co banka vydělala a nastavení, která to řídí. Verzované nastavení, exporty a kontrola součtů přijdou ve fázi 6.",
+  econSub: "Co banka vydělala a nastavení, která to řídí, plus kontrola knih, výstrahy nadstandardních výdělků a snapshoty konfigurace.",
 
   // ---------- Fáze 5 — duely na /admin/moderation ----------
   admModDuelsTitle: "Duely",
@@ -2682,6 +2729,53 @@ const cs: Dict = {
   // ---------- Fáze 5 — tvorba účtu na /admin/players ----------
   admPlayersCreateTitle: "Vytvořit účet",
   admPlayersCreateSub: "Ručně vytvořený účet pro rodinu — nikdo nemusí bojovat s registračním formulářem.",
+
+  // ---------- Fáze 6 — nastavení platformy (/admin/settings) ----------
+  admSetTitle: "Nastavení platformy",
+  admSetSub: "Přepínač registrací, režim údržby a rodinné oznámení — každá změna skončí v auditu i s důvodem.",
+  admSetReg: "Registrace",
+  admSetRegOpen: "Otevřená — kdokoli se může přidat",
+  admSetRegClosed: "Zavřená — jen stávající členové",
+  admSetRegNote: "Dokud je zavřená, nové registrace se odmítají a přihlašování ukazuje poznámku.",
+  admSetMaint: "Režim údržby",
+  admSetMaintOff: "Vypnutý",
+  admSetMaintOn: "Zapnutý — jen admini",
+  admSetMaintNote: "Hráčské akce se zastaví na centrální bráně; admini pokračují, aby mohli vše opravit.",
+  admSetAnn: "Oznámení (banner)",
+  admSetAnnTitlePh: "Titulek — prázdný skryje banner",
+  admSetAnnBodyPh: "Doplňující text (nepovinný)",
+  admSetAnnLevel: "Naléhavost",
+  admSetAnnInfo: "Informace",
+  admSetAnnWarn: "Výstraha",
+  admSetAnnUntil: "Platí do (prázdné = napořád)",
+  admSetAnnNote: "Zobrazuje se na celém webu nad hlavičkou, dokud nevyprší datum.",
+  admSetChangeNote: "Důvod (do auditu)",
+  admSetSave: "Uložit nastavení",
+  admSetSaved: "Nastavení uloženo",
+  admSetLastChanged: (who: string, when: string) => `Změnil ${who} · ${when}`,
+  admSetVersionsNote: "Vratné body ekonomických knoflíků a rollback najdeš na desce Ekonomika.",
+  bannerMaint: "Režim údržby — hráčské akce jsou chvíli pozastavené",
+  regClosedNote: "Registrace je teď zavřená — stávající členové se přihlásí bez potíží.",
+
+  // ---------- Fáze 6 — ekonomika: kontrola knih, výstrahy, exporty, snapshoty ----------
+  econReconTitle: "Kontrola knih",
+  econReconNote: "Každý pohyb Monů se rodí v knize pohybů — součet knih se musí rovnat součtu zůstatků.",
+  econReconOk: "Knihy se shodují Ɱ-za-Ɱ",
+  econReconOff: (m: string) => `Knihy se práskají o ${m}`,
+  econReconLedger: "Σ knihy:",
+  econReconBalances: "Σ zůstatky:",
+  econReconUser: "Hráč",
+  econReconDriftAcc: "Rozdíl",
+  econExLedger: "Kniha CSV",
+  econExBalances: "Zůstatky CSV",
+  econAlerts: "Nadstandardní výdělky",
+  econAlertsItem: "za 7 dní — stojí za pohled",
+  econAlertsQuiet: "Nic neobvyklého — za 7 dní žádný výdělek mimo medianský průměr.",
+  econVersions: "Vratné body konfigurace",
+  econVersionsNote: "Hodnoty knoflíků, které každé zdokumentované uložení přepsalo; vrácením je vrátíš zpět.",
+  econVersionsEmpty: "Zatím žádné vratné body — nejdřív něco ulož.",
+  econRollback: "Vrátit zpět",
+  econRollbackDone: "Konfigurace vrácena zpět",
 };
 
 const dict: Record<Lang, Dict> = { en, cs };
@@ -2955,6 +3049,13 @@ const ERR_CS: Record<string, string> = {
   "Config failed": "Uložení se nepovedlo",
   "Create failed": "Vytvoření se nepovedlo",
   "Settle failed": "Vyhodnocení se nepovedlo",
+  // settings & versioned config (fáze 6)
+  "Rollback failed": "Vrácení konfigurace se nepovedlo",
+  "Settings failed": "Uložení nastavení se nepovedlo",
+  "Config version not found": "Snapshot konfigurace nenalezen",
+  "Site under maintenance": "Web je v režimu údržby — akce hráčů jsou pozastavené",
+  "Registration is closed": "Registrace je teď zavřená — jen pro členy",
+  "Bad date": "Chybné datum",
 };
 
 // Parameterized server errors — translate the fixed prefix, keep the payload.

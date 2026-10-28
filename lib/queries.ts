@@ -6,6 +6,7 @@ import { eq, ne, desc, asc, and, gte, ilike, or, sql, inArray, isNull, isNotNull
 import { yesPrice, multiCoords, multiPrices } from "@/lib/lmsr";
 import { accruedDebtCents } from "@/lib/loans";
 import { credit, garnishDebt } from "@/lib/tx-market";
+import { reconcileEconomy } from "@/lib/econ";
 import type { MarketStatus } from "@/lib/db/schema";
 
 export type MarketRow = typeof schema.market.$inferSelect;
@@ -66,6 +67,14 @@ export const listCategories = unstable_cache(
   ["list-categories"],
   { revalidate: 60, tags: ["categories"] }
 );
+
+// Platform settings (Phase 6) — the /admin/settings singleton: registration
+// switch, maintenance mode and the global banner. Read hot on every render
+// (a mode switch must take effect within seconds) but it's one primary-key row.
+export async function getSettings() {
+  const [row] = await db.select().from(schema.platformConfig).limit(1);
+  return row ?? null;
+}
 
 // Categories with their market count — for the admin manager (deleting is
 // only allowed when a category is empty).
@@ -1450,8 +1459,7 @@ export async function getDisputedDuels() {
 }
 
 // Squad standings — aggregate the leaderboard rows by squad.
-export async function getSquads() {
-  const squads = await db.select().from(schema.squad);
+export async function getSquads() {  const squads = await db.select().from(schema.squad);
   const board = await getLeaderboard();
   return squads
     .map((s) => {
@@ -1648,4 +1656,36 @@ export async function getPositionBadges(marketIds: string[]) {
     })
     .from(schema.position)
     .where(inArray(schema.position.marketId, marketIds));
+}
+
+// Reconciliation (Phase 6, /admin/economy) — Σ ledger rows vs Σ stored
+// balances, globally and per user. Every Mony movement is born a ledger row,
+// so a nonzero diff means money moved outside the books. Admin-money ops are
+// NOT excluded (a grant is a real movement) — only notify-style zero rows are
+// ignored, since they carry no amount.
+export async function getReconciliation() {
+  const [users, ledgerRows] = await Promise.all([
+    db
+      .select({ id: schema.user.id, username: schema.user.username, balanceCents: schema.user.balanceCents })
+      .from(schema.user),
+    db.select({ userId: schema.ledger.userId, amountCents: schema.ledger.amountCents }).from(schema.ledger),
+  ]);
+  return reconcileEconomy(ledgerRows, users);
+}
+
+// Config versions (Phase 6, /admin/economy) — the knob-map snapshots written
+// by the audited house-config saves, newest first.
+export async function getConfigVersions(limit = 25) {
+  return db
+    .select({
+      id: schema.configVersion.id,
+      data: schema.configVersion.data,
+      changedBy: schema.configVersion.changedBy,
+      changedByName: schema.configVersion.changedByName,
+      note: schema.configVersion.note,
+      createdAt: schema.configVersion.createdAt,
+    })
+    .from(schema.configVersion)
+    .orderBy(desc(schema.configVersion.createdAt))
+    .limit(limit);
 }

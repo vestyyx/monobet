@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import { Toaster } from "sonner";
 import Link from "next/link";
 import { SiteHeader } from "@/components/site-header";
+import { PlatformBanner } from "@/components/platform-banner";
 import { LogoMark } from "@/components/logo";
 import { IntroVideo, TrailerLink } from "@/components/intro-video";
 import { getLang } from "@/lib/lang-server";
@@ -40,6 +41,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         />
       </head>
       <body className="min-h-dvh flex flex-col">
+        <PlatformBanner />
         <SiteHeader />
         <main className="flex-1">{children}</main>
         <footer className="border-t border-line mt-16">

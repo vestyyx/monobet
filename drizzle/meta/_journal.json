@@ -414,6 +414,13 @@
       "when": 1793134053925,
       "tag": "0058_gig-config",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1793136331352,
+      "tag": "0059_platform-config",
+      "breakpoints": true
     }
   ]
 }

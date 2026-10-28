@@ -437,6 +437,25 @@ export const gigConfig = pgTable("gig_config", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Platform config (Phase 6) — the /admin/settings singleton: registration
+// switch, maintenance mode and the global announcement banner.
+export const platformConfig = pgTable("platform_config", {
+  id: text("id").primaryKey().default("platform"),
+  registrationOpen: boolean("registration_open").notNull().default(true),
+  maintenance: boolean("maintenance").notNull().default(false),
+  // Announcement banner: empty title = no banner; `until` auto-expires it.
+  annTitle: text("ann_title").notNull().default(""),
+  annBody: text("ann_body").notNull().default(""),
+  annLevel: text("ann_level").notNull().default("info"), // info | warn
+  annUntil: timestamp("ann_until", { withTimezone: true }),
+  updatedBy: text("updated_by").notNull().default(""),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Config versions already exist further down in the file (see the
+// "Economy/platform config snapshots" table) — Phase 6 writes them from the
+// audited house-knob saves and rolls them back; no new table needed.
+
 // ---------- squads ----------
 
 // A named group users join freely — the leaderboard shows combined net worth

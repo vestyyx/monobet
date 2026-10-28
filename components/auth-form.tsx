@@ -8,7 +8,7 @@ import { signIn, signUp } from "@/lib/auth-client";
 import { claimReferral } from "@/lib/actions";
 import { Button, Card, Input, Segmented, Avatar } from "@/components/ui/primitives";
 import { LogoMark } from "@/components/logo";
-import { Gift } from "lucide-react";
+import { Gift, Lock } from "lucide-react";
 import { fmtMonos } from "@/lib/money";
 import { playSfx } from "@/lib/sfx";
 import { REFEREE_BONUS, REFERRER_BONUS } from "@/lib/rewards";
@@ -16,11 +16,13 @@ import { getT, type Lang } from "@/lib/i18n";
 
 type Inviter = { username: string; name: string; image: string | null } | null;
 
-export function AuthForm({ lang, inviter }: { lang?: Lang; inviter?: Inviter }) {
+export function AuthForm({ lang, inviter, regOpen = true }: { lang?: Lang; inviter?: Inviter; regOpen?: boolean }) {
   const params = useSearchParams();
   const t = getT(lang ?? "cs");
+  // Registration closed (Phase 6, /admin/settings): the sign-up tab goes away
+  // entirely and the login form carries a short "registration is closed" note.
   const [mode, setMode] = useState<"login" | "signup">(
-    params.get("mode") === "signup" || params.get("ref") ? "signup" : "login"
+    regOpen && (params.get("mode") === "signup" || params.get("ref")) ? "signup" : "login"
   );
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -76,13 +78,23 @@ export function AuthForm({ lang, inviter }: { lang?: Lang; inviter?: Inviter }) 
       </div>
 
       <Segmented
-        options={[
-          { value: "login", label: t.logIn },
-          { value: "signup", label: t.signUp },
-        ]}
+        options={
+          regOpen
+            ? [
+                { value: "login", label: t.logIn },
+                { value: "signup", label: t.signUp },
+              ]
+            : [{ value: "login", label: t.logIn }]
+        }
         value={mode}
         onChange={setMode}
       />
+
+      {!regOpen && (
+        <p className="mt-4 rounded-xl border border-line bg-surface-2 px-3.5 py-2.5 text-[12.5px] text-mute flex items-center gap-2">
+          <Lock className="size-3.5 shrink-0" /> {t.regClosedNote}
+        </p>
+      )}
 
       {mode === "signup" && params.get("ref") && (
         <div className="mt-4 rounded-xl border border-brand/30 bg-brand-soft/60 px-4 py-3.5">

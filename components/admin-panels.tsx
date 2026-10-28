@@ -4,7 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button, Input } from "@/components/ui/primitives";
-import { createCategory, renameCategory, deleteCategory, reorderCategories, adminCreateUser, setLeverageConfig, setHouseRules, adminResetEconomy } from "@/lib/actions";
+import { createCategory, renameCategory, deleteCategory, reorderCategories, adminCreateUser, adminResetEconomy } from "@/lib/actions";
+import { adminSaveLeverageConfig, adminSaveHouseRules } from "@/lib/actions-admin";
 import { fmtMonos } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { getT, type Lang } from "@/lib/i18n";
@@ -14,11 +15,16 @@ function useAction(lang?: Lang) {
   const t = getT(lang ?? "cs");
   const [pending, start] = useTransition();
   const router = useRouter();
-  const run = (fn: () => Promise<{ ok: boolean; error?: string; paidOut?: number }>, ok: string) =>
+  const run = (
+    fn: () => Promise<{ ok: boolean; error?: string; paidOut?: number }>,
+    ok: string,
+    after?: () => void
+  ) =>
     start(async () => {
       const r = await fn();
       if (r.ok) {
         toast.success(r.paidOut ? `${ok} — ${fmtMonos(r.paidOut, { lang })}` : ok);
+        after?.();
         router.refresh();
       } else toast.error(t.serverErr(r.error));
     });
@@ -66,6 +72,12 @@ export function HousePanel({
   const [ruleRoyPct, setRuleRoyPct] = useState((stats.rules.referralRoyaltyBps / 100).toString());
   const [ruleRoyCap, setRuleRoyCap] = useState((stats.rules.referralRoyaltyCapCents / 100).toString());
   const [ruleMinTrade, setRuleMinTrade] = useState((stats.rules.minTradeCents / 100).toString());
+  // Phase 6 — saves are audited (config_version snapshot + audit row), so each
+  // form carries a mandatory reason.
+  const [levReason, setLevReason] = useState("");
+  const [ruleReason, setRuleReason] = useState("");
+  const levReady = levReason.trim().length >= 5;
+  const ruleReady = ruleReason.trim().length >= 5;
 
   return (
     <div className="p-4 space-y-5">
@@ -104,14 +116,17 @@ export function HousePanel({
           className="rounded-xl border border-line bg-surface-2 p-3 space-y-2"
           onSubmit={(e) => {
             e.preventDefault();
+            if (!levReady) return;
             run(
               () =>
-                setLeverageConfig({
+                adminSaveLeverageConfig({
                   tradeMaxLev: Math.round(parseFloat(levTrade || "1")),
                   levFeeBps: Math.round(parseFloat(levFee || "0") * 100),
                   tradeMaxSpendCents: Math.round(parseFloat(betTrade || "5000") * 100),
+                  reason: levReason.trim(),
                 }),
-              t.savedToast
+              t.savedToast,
+              () => setLevReason("")
             );
           }}
         >
@@ -132,8 +147,14 @@ export function HousePanel({
           </div>
           <div className="flex items-center justify-between gap-2">
             <p className="text-[11px] text-faint">{t.levCfgNote}</p>
-            <Button size="sm" disabled={pending}>{t.save}</Button>
+            <Button size="sm" disabled={pending || !levReady}>{t.save}</Button>
           </div>
+          <Input
+            value={levReason}
+            onChange={(e) => setLevReason(e.target.value)}
+            placeholder={t.admReasonPh}
+            className="h-8 text-[12.5px]"
+          />
         </form>
 
         <form
@@ -141,16 +162,19 @@ export function HousePanel({
           className="rounded-xl border border-line bg-surface-2 p-3 space-y-2"
           onSubmit={(e) => {
             e.preventDefault();
+            if (!ruleReady) return;
             run(
               () =>
-                setHouseRules({
+                adminSaveHouseRules({
                   tradeFeeCents: Math.round(parseFloat(ruleTradeFee || "0") * 100),
                   debtRateBps: Math.round(parseFloat(ruleApr || "0") * 100),
                   referralRoyaltyBps: Math.round(parseFloat(ruleRoyPct || "0") * 100),
                   referralRoyaltyCapCents: Math.round(parseFloat(ruleRoyCap || "0") * 100),
                   minTradeCents: Math.round(parseFloat(ruleMinTrade || "0") * 100),
+                  reason: ruleReason.trim(),
                 }),
-              t.savedToast
+              t.savedToast,
+              () => setRuleReason("")
             );
           }}
         >
@@ -179,8 +203,14 @@ export function HousePanel({
           </div>
           <div className="flex items-center justify-between gap-2">
             <p className="text-[11px] text-faint">{t.rulesNote}</p>
-            <Button size="sm" disabled={pending}>{t.save}</Button>
+            <Button size="sm" disabled={pending || !ruleReady}>{t.save}</Button>
           </div>
+          <Input
+            value={ruleReason}
+            onChange={(e) => setRuleReason(e.target.value)}
+            placeholder={t.admReasonPh}
+            className="h-8 text-[12.5px]"
+          />
         </form>
 
         <div className="rounded-xl border border-line bg-surface-2 p-3 space-y-2">
