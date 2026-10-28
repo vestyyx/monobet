@@ -33,9 +33,7 @@
 | 4 | Moderation + suspicious activity | ✅ done | `9cb48f5` (PR #8) |
 | 5 | Markets desk + gigs desk + duel tiebreak + economy | ✅ done | `13031ce` (PR #9) |
 | 6 | Settings: announcements, maintenance, registration + versioned config | ✅ done | `e4616e1` (PR #10) |
-| 5 | Module admin pages (markets, games, gigs) | ⬜ queued | — |
-| 6 | Economy dashboard, config versioning, exports, reconciliation | ⬜ queued | — |
-| 7 | Roles/security hardening, UI polish, tests, 2-min demo path | ⬜ queued | — |
+| 7 | Hardening & polish: rate limits, headers, soft-delete, pagination, demo path | ✅ done | `cc8961f` (PR #11) |
 
 ---
 
